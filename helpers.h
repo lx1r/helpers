@@ -45,6 +45,34 @@
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 #define ___defer_free __attribute__((__cleanup__(___pfree)))
 
+#undef __always_inline
+#define __always_inline inline __attribute__((always_inline))
+
+#define ALIGN(x, a)		ALIGN_MASK(x, (typeof(x))(a) - 1)
+#define ALIGN_DOWN(x, a)	ALIGN((x) - ((a) - 1), (a))
+#define ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+
+#define BITS_PER_LONG	64
+#define BIT_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG))
+#define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
+
+static __always_inline bool test_bit(unsigned long nr, unsigned long *bits)
+{
+	if (bits[BIT_WORD(nr)] & BIT_MASK(nr))
+		return true;
+	return false;
+}
+
+static __always_inline void set_bit(unsigned long nr, unsigned long *bits)
+{
+	bits[BIT_WORD(nr)] |= BIT_MASK(nr);
+}
+
+static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
+{
+	bits[BIT_WORD(nr)] &= ~BIT_MASK(nr);
+}
+
 static inline size_t ___align_sz(size_t nb)
 {
 	if (!nb) return 0;
@@ -63,18 +91,31 @@ static inline size_t ___align_sz(size_t nb)
 }
 
 struct ___meta {
-	size_t len;
+	unsigned long len;
 };
 
-#define ___cap(ptr) malloc_usable_size(ptr)
-#define ___meta_sz sizeof(struct ___meta)
-#define ___meta(ptr) ((struct ___meta *)((void *)(ptr) + ___cap(ptr) - ___meta_sz))
-#define ___len(ptr) ___meta(ptr)->len
+struct ___meta_used {
+	unsigned long used[0];
+};
 
-#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_sz) / sizeof(*(ptr))) : 0)
+#define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
+
+#define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(unsigned long)))
+#define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(unsigned long)))
+#define ___meta_len_sz()	sizeof(struct ___meta)
+#define ___meta_used_sz(len)	((BIT_WORD(len - 1) + 1) * sizeof(unsigned long))
+
+#define ___meta_len_ptr(ptr)	((struct ___meta *)((void *)(ptr) + ___cap(ptr) - ___meta_len_sz()))
+#define ___len(ptr)		___meta_len_ptr(ptr)->len
+
+#define ___meta_has_used(ptr)	(___meta_len_ptr(ptr)->len & ___HAS_USED_MASK)
+#define ___meta_used_ptr(ptr)   ((struct ___meta_used *)((void *)(ptr) + ___cap(ptr) - ___meta_len_sz() - ___meta_used_sz(___len(ptr))))
+#define ___meta_sz(ptr)		___meta_len_sz() + (___meta_has_used(ptr) ? ___meta_used_sz(___len(ptr)) : 0)
+
+#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_len_sz(ptr)) / sizeof(*(ptr))) : 0)
 #define len(ptr) ((ptr) ? ___len(ptr) : 0)
 
-#define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz((len)*sizeof(*(ptr)) + ___meta_sz))
+#define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz(___user_sz(ptr, len) + ___meta_len_sz()))
 
 #define append(pptr, ...) ({\
 	size_t ___len = len(*(pptr));\

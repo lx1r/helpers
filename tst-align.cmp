@@ -1,0 +1,6 @@
+malloc(1): 24
+malloc(32): 40
+ALIGN(1)=8
+ALIGN_DOWN(1)=0
+ALIGN_DOWN(8)=8
+ALIGN_DOWN(40)=40
