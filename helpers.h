@@ -1,6 +1,11 @@
 #ifndef ___HELPERS_H
 #define ___HELPERS_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <string.h>
+
 #ifndef ___concat
 #define ___concat(a, b) a ## b
 #endif
@@ -21,13 +26,13 @@
 #define ___fill3(arr, p, x, ...) arr[p] = x; ___fill2(arr, p + 1, __VA_ARGS__)
 #define ___fill4(arr, p, x, ...) arr[p] = x; ___fill3(arr, p + 1, __VA_ARGS__)
 #define ___fill5(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill6(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill7(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill8(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill9(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill10(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill11(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill12(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
+#define ___fill6(arr, p, x, ...) arr[p] = x; ___fill5(arr, p + 1, __VA_ARGS__)
+#define ___fill7(arr, p, x, ...) arr[p] = x; ___fill6(arr, p + 1, __VA_ARGS__)
+#define ___fill8(arr, p, x, ...) arr[p] = x; ___fill7(arr, p + 1, __VA_ARGS__)
+#define ___fill9(arr, p, x, ...) arr[p] = x; ___fill8(arr, p + 1, __VA_ARGS__)
+#define ___fill10(arr, p, x, ...) arr[p] = x; ___fill9(arr, p + 1, __VA_ARGS__)
+#define ___fill11(arr, p, x, ...) arr[p] = x; ___fill10(arr, p + 1, __VA_ARGS__)
+#define ___fill12(arr, p, x, ...) arr[p] = x; ___fill11(arr, p + 1, __VA_ARGS__)
 
 #define ___fill(arr, ...)\
 	___apply(___fill, ___narg(__VA_ARGS__))(arr, 0, ##__VA_ARGS__)
@@ -66,7 +71,7 @@ struct ___meta {
 #define ___meta(ptr) ((struct ___meta *)((void *)(ptr) + ___cap(ptr) - ___meta_sz))
 #define ___len(ptr) ___meta(ptr)->len
 
-#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_sz) / sizeof(*ptr)) : 0)
+#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_sz) / sizeof(*(ptr))) : 0)
 #define len(ptr) ((ptr) ? ___len(ptr) : 0)
 
 #define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz((len)*sizeof(*(ptr)) + ___meta_sz))
