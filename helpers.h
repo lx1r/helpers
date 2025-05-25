@@ -90,30 +90,68 @@ static inline size_t ___align_sz(size_t nb)
 	return nb + 1;
 }
 
-struct ___meta {
-	unsigned long len;
+struct ___meta_len {
+	size_t len;
 };
 
 struct ___meta_used {
-	unsigned long used[0];
+	unsigned long bits[0];
 };
 
 #define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
+#define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
+#define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(size_t)))
+#define ___meta_len_sz()	sizeof(size_t)
+#define ___meta_used_sz(len)	((BIT_WORD((len) - 1) + 1) * sizeof(unsigned long))
 
-#define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(unsigned long)))
-#define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(unsigned long)))
-#define ___meta_len_sz()	sizeof(struct ___meta)
-#define ___meta_used_sz(len)	((BIT_WORD(len - 1) + 1) * sizeof(unsigned long))
+//#define ___meta_len_ptr(ptr, cap)   ((struct ___meta_len *)((void *)(ptr) + (cap) - ___meta_len_sz()))
+//#define ___meta_used_ptr(ptr, cap) ((struct ___meta_used *)((void *)(ptr) + (cap) - ___meta_len_sz() - ___meta_used_sz(___meta_len_ptr(ptr, cap)->len & ~___HAS_USED_MASK)))
 
-#define ___meta_len_ptr(ptr)	((struct ___meta *)((void *)(ptr) + ___cap(ptr) - ___meta_len_sz()))
-#define ___len(ptr)		___meta_len_ptr(ptr)->len
+//#define ___meta_sz(ptr)	___meta_len_sz() + (___meta_has_used(ptr) ? ___meta_used_sz(___len(ptr)) : 0)
 
-#define ___meta_has_used(ptr)	(___meta_len_ptr(ptr)->len & ___HAS_USED_MASK)
-#define ___meta_used_ptr(ptr)   ((struct ___meta_used *)((void *)(ptr) + ___cap(ptr) - ___meta_len_sz() - ___meta_used_sz(___len(ptr))))
-#define ___meta_sz(ptr)		___meta_len_sz() + (___meta_has_used(ptr) ? ___meta_used_sz(___len(ptr)) : 0)
+//#define ___meta_has_used(ptr)	(___meta_len_ptr(ptr)->len & ___HAS_USED_MASK)
 
-#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_len_sz(ptr)) / sizeof(*(ptr))) : 0)
-#define len(ptr) ((ptr) ? ___len(ptr) : 0)
+//#define cap(ptr) ((ptr) ? ((___cap(ptr) - ___meta_len_sz(ptr)) / sizeof(*(ptr))) : 0)
+//#define len(ptr) ((ptr) ? ___meta_len_ptr(ptr, ___cap(ptr))->len & ~___HAS_USED_MASK : 0)
+
+
+static inline size_t ___get_meta(void *ptr, size_t **len_pptr, unsigned long **used_pptr)
+{
+	if (!ptr)
+		return 0;
+	size_t *len_ptr = ptr + ___cap(ptr) - ___meta_len_sz();
+	size_t len = *len_ptr;
+
+	if (len_pptr)
+		*len_pptr = len_ptr;
+
+	if (len & ___HAS_USED_MASK) {
+		len &= ~___HAS_USED_MASK;
+		if (used_pptr)
+			*used_pptr = (void *)*len_ptr - ___meta_used_sz(len);
+	}
+	return len;
+}
+
+//set_meta_len
+//set_meta_used
+
+#define len(ptr) ___get_meta(ptr, NULL, NULL)
+
+#define ___alloc_tbl(ptr, len) ({\
+	size_t ___len = len;\
+	ptr = malloc(___user_sz(ptr, ___len) + ___meta_used_sz(___len) + ___meta_len_sz());\
+	size_t *___len_ptr; unsigned long *___used_ptr;\
+	___get_meta(ptr, &___len_ptr, &___used_ptr);\
+	*___len_ptr = ___len | ___HAS_USED_MASK;\
+	memset(___used_ptr, 0, ___meta_used_sz(___len));\
+})
+
+#define ___used(ptr, slot) ({\
+	unsigned long *___used_ptr;\
+	___get_meta(ptr, NULL, &___used_ptr);\
+	test_bit(slot, ptr);\
+})
 
 #define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz(___user_sz(ptr, len) + ___meta_len_sz()))
 
@@ -121,7 +159,9 @@ struct ___meta_used {
 	size_t ___len = len(*(pptr));\
 	___extend(*(pptr), ___len + ___narg(__VA_ARGS__));\
 	___fill((*(pptr) + ___len), ##__VA_ARGS__);\
-	___len(*(pptr)) = ___len + ___narg(__VA_ARGS__);\
+	size_t *___len_ptr;\
+	___get_meta(*(pptr), &___len_ptr, NULL);\
+	*___len_ptr = ___len + ___narg(__VA_ARGS__);\
 })
 
 #define ___fill_pr_fmt(arr, x)\
