@@ -77,6 +77,10 @@ static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 #define ___defer_free __attribute__((__cleanup__(___pfree)))
 
+static inline void *zalloc(size_t size) { return calloc(1, size); }
+void ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
+#define zfree(ptr) __zfree((void **)(ptr))
+
 #define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
 #define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
 #define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(size_t)))
