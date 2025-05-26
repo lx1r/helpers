@@ -1,11 +1,6 @@
 #ifndef ___HELPERS_H
 #define ___HELPERS_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <malloc.h>
-#include <string.h>
-
 #ifndef ___concat
 #define ___concat(a, b) a ## b
 #endif
@@ -42,9 +37,6 @@
 	(arr) += ___narg(__VA_ARGS__);\
 })
 
-static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
-#define ___defer_free __attribute__((__cleanup__(___pfree)))
-
 #define static_len(va) (sizeof(va)/sizeof(va[0]))
 
 #undef __always_inline
@@ -75,22 +67,15 @@ static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
 	bits[BIT_WORD(nr)] &= ~BIT_MASK(nr);
 }
 
-static inline size_t ___align_sz(size_t nb)
-{
-	if (!nb) return 0;
-	/* initial size */
-	if (!(nb & ~0xf))
-		return 64;
-	/* align to page */
-	if (nb & ~0xfff)
-		return (nb + 0xfff) & ~0xfff;
-	/* align to power of 2 */
-	nb = nb - 1;
-	nb |= (nb >> 1);
-	nb |= (nb >> 2);
-	nb |= (nb >> 4);
-	return nb + 1;
-}
+#ifndef NO_LIBC
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <string.h>
+
+static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
+#define ___defer_free __attribute__((__cleanup__(___pfree)))
 
 #define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
 #define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
@@ -137,6 +122,23 @@ static inline size_t len(void *ptr)
 	unsigned long *___used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
 	set_bit(slot, ___used_ptr);\
 })
+
+static inline size_t ___align_sz(size_t nb)
+{
+	if (!nb) return 0;
+	/* initial size */
+	if (!(nb & ~0xf))
+		return 64;
+	/* align to page */
+	if (nb & ~0xfff)
+		return (nb + 0xfff) & ~0xfff;
+	/* align to power of 2 */
+	nb = nb - 1;
+	nb |= (nb >> 1);
+	nb |= (nb >> 2);
+	nb |= (nb >> 4);
+	return nb + 1;
+}
 
 #define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz(___user_sz(ptr, len) + ___meta_len_sz()))
 
@@ -284,4 +286,5 @@ static inline size_t len(void *ptr)
 #define func(args, expr)\
 	({ typeof(({ ___apply(___decl, ___narg args) args expr; })) ___func args { return expr; } ___func; })
 
+#endif /* NO_LIBC */
 #endif
