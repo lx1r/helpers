@@ -45,6 +45,8 @@
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 #define ___defer_free __attribute__((__cleanup__(___pfree)))
 
+#define static_len(va) (sizeof(va)/sizeof(va[0]))
+
 #undef __always_inline
 #define __always_inline inline __attribute__((always_inline))
 
