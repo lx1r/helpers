@@ -8,6 +8,11 @@ static void walk(int *nums)
 	println();
 }
 
+struct unit {
+	int id;
+	int data;
+};
+
 int main()
 {
 	int *nums = NULL;
@@ -22,6 +27,10 @@ int main()
 	append(&nums, 29, 30, 31, 32, 33, 34, 35, 36);
 
 	walk(nums);
+
+	struct unit *units = NULL;
+
+	append(&units, ((struct unit){1, 11}));
 
 	return 0;
 }

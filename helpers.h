@@ -15,26 +15,26 @@
 	___nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#define ___fill0(arr, p)
-#define ___fill1(arr, p, x) arr[p] = x
-#define ___fill2(arr, p, x, ...) arr[p] = x; ___fill1(arr, p + 1, __VA_ARGS__)
-#define ___fill3(arr, p, x, ...) arr[p] = x; ___fill2(arr, p + 1, __VA_ARGS__)
-#define ___fill4(arr, p, x, ...) arr[p] = x; ___fill3(arr, p + 1, __VA_ARGS__)
-#define ___fill5(arr, p, x, ...) arr[p] = x; ___fill4(arr, p + 1, __VA_ARGS__)
-#define ___fill6(arr, p, x, ...) arr[p] = x; ___fill5(arr, p + 1, __VA_ARGS__)
-#define ___fill7(arr, p, x, ...) arr[p] = x; ___fill6(arr, p + 1, __VA_ARGS__)
-#define ___fill8(arr, p, x, ...) arr[p] = x; ___fill7(arr, p + 1, __VA_ARGS__)
-#define ___fill9(arr, p, x, ...) arr[p] = x; ___fill8(arr, p + 1, __VA_ARGS__)
-#define ___fill10(arr, p, x, ...) arr[p] = x; ___fill9(arr, p + 1, __VA_ARGS__)
-#define ___fill11(arr, p, x, ...) arr[p] = x; ___fill10(arr, p + 1, __VA_ARGS__)
-#define ___fill12(arr, p, x, ...) arr[p] = x; ___fill11(arr, p + 1, __VA_ARGS__)
+#define ___fill0(ptr, p)
+#define ___fill1(ptr, p, x) ptr[p] = x
+#define ___fill2(ptr, p, x, ...) ptr[p] = x; ___fill1(ptr, p + 1, __VA_ARGS__)
+#define ___fill3(ptr, p, x, ...) ptr[p] = x; ___fill2(ptr, p + 1, __VA_ARGS__)
+#define ___fill4(ptr, p, x, ...) ptr[p] = x; ___fill3(ptr, p + 1, __VA_ARGS__)
+#define ___fill5(ptr, p, x, ...) ptr[p] = x; ___fill4(ptr, p + 1, __VA_ARGS__)
+#define ___fill6(ptr, p, x, ...) ptr[p] = x; ___fill5(ptr, p + 1, __VA_ARGS__)
+#define ___fill7(ptr, p, x, ...) ptr[p] = x; ___fill6(ptr, p + 1, __VA_ARGS__)
+#define ___fill8(ptr, p, x, ...) ptr[p] = x; ___fill7(ptr, p + 1, __VA_ARGS__)
+#define ___fill9(ptr, p, x, ...) ptr[p] = x; ___fill8(ptr, p + 1, __VA_ARGS__)
+#define ___fill10(ptr, p, x, ...) ptr[p] = x; ___fill9(ptr, p + 1, __VA_ARGS__)
+#define ___fill11(ptr, p, x, ...) ptr[p] = x; ___fill10(ptr, p + 1, __VA_ARGS__)
+#define ___fill12(ptr, p, x, ...) ptr[p] = x; ___fill11(ptr, p + 1, __VA_ARGS__)
 
-#define ___fill(arr, ...)\
-	___apply(___fill, ___narg(__VA_ARGS__))(arr, 0, ##__VA_ARGS__)
+#define ___fill(ptr, ...)\
+	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
 
-#define ___fill_shift(arr, ...) ({\
-	___fill(arr, __VA_ARGS__);\
-	(arr) += ___narg(__VA_ARGS__);\
+#define ___fill_shift(ptr, ...) ({\
+	___fill(ptr, __VA_ARGS__);\
+	(ptr) += ___narg(__VA_ARGS__);\
 })
 
 #define static_len(va) (sizeof(va)/sizeof(va[0]))
@@ -154,43 +154,43 @@ static inline size_t ___align_sz(size_t nb)
 	*___len_ptr = ___len + ___narg(__VA_ARGS__);\
 })
 
-#define ___fill_pr_fmt(arr, x)\
+#define ___fill_pr_fmt(ptr, x)\
 	_Generic(x,\
-		 _Bool:                 ___fill_shift(arr, '%', 'd'),\
-		 char:                  ___fill_shift(arr, '%', 'c'),\
-		 signed char:           ___fill_shift(arr, '%', 'h', 'h', 'i'),\
-		 unsigned char:         ___fill_shift(arr, '%', 'h', 'h', 'u'),\
-		 signed short:          ___fill_shift(arr, '%', 'h', 'i'),\
-		 unsigned short:        ___fill_shift(arr, '%', 'h', 'u'),\
-		 signed int:            ___fill_shift(arr, '%', 'i'),\
-		 unsigned int:          ___fill_shift(arr, '%', 'u'),\
-		 signed long:           ___fill_shift(arr, '%', 'l', 'i'),\
-		 unsigned long:         ___fill_shift(arr, '%', 'l', 'u'),\
-		 signed long long:      ___fill_shift(arr, '%', 'l', 'l', 'i'),\
-		 unsigned long long:    ___fill_shift(arr, '%', 'l', 'l', 'u'),\
-		 float:                 ___fill_shift(arr, '%', 'f'),\
-		 double:                ___fill_shift(arr, '%', 'f'),\
-		 long double:           ___fill_shift(arr, '%', 'L', 'f'),\
-		 char *:                ___fill_shift(arr, '%', 's'),\
-		 const char *:          ___fill_shift(arr, '%', 's'),\
-		 default:               ___fill_shift(arr, '%', 'p'))
+		 _Bool:                 ___fill_shift(ptr, '%', 'd'),\
+		 char:                  ___fill_shift(ptr, '%', 'c'),\
+		 signed char:           ___fill_shift(ptr, '%', 'h', 'h', 'i'),\
+		 unsigned char:         ___fill_shift(ptr, '%', 'h', 'h', 'u'),\
+		 signed short:          ___fill_shift(ptr, '%', 'h', 'i'),\
+		 unsigned short:        ___fill_shift(ptr, '%', 'h', 'u'),\
+		 signed int:            ___fill_shift(ptr, '%', 'i'),\
+		 unsigned int:          ___fill_shift(ptr, '%', 'u'),\
+		 signed long:           ___fill_shift(ptr, '%', 'l', 'i'),\
+		 unsigned long:         ___fill_shift(ptr, '%', 'l', 'u'),\
+		 signed long long:      ___fill_shift(ptr, '%', 'l', 'l', 'i'),\
+		 unsigned long long:    ___fill_shift(ptr, '%', 'l', 'l', 'u'),\
+		 float:                 ___fill_shift(ptr, '%', 'f'),\
+		 double:                ___fill_shift(ptr, '%', 'f'),\
+		 long double:           ___fill_shift(ptr, '%', 'L', 'f'),\
+		 char *:                ___fill_shift(ptr, '%', 's'),\
+		 const char *:          ___fill_shift(ptr, '%', 's'),\
+		 default:               ___fill_shift(ptr, '%', 'p'))
 
-#define ___fill_fmt0(arr, x)
-#define ___fill_fmt1(arr, x) ___fill_pr_fmt(arr, x)
-#define ___fill_fmt2(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt1(arr, __VA_ARGS__)
-#define ___fill_fmt3(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt2(arr, __VA_ARGS__)
-#define ___fill_fmt4(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt3(arr, __VA_ARGS__)
-#define ___fill_fmt5(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt4(arr, __VA_ARGS__)
-#define ___fill_fmt6(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt5(arr, __VA_ARGS__)
-#define ___fill_fmt7(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt6(arr, __VA_ARGS__)
-#define ___fill_fmt8(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt7(arr, __VA_ARGS__)
-#define ___fill_fmt9(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt8(arr, __VA_ARGS__)
-#define ___fill_fmt10(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt9(arr, __VA_ARGS__)
-#define ___fill_fmt11(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt10(arr, __VA_ARGS__)
-#define ___fill_fmt12(arr, x, ...) ___fill_pr_fmt(arr, x); ___fill_fmt11(arr, __VA_ARGS__)
+#define ___fill_fmt0(ptr, x)
+#define ___fill_fmt1(ptr, x) ___fill_pr_fmt(ptr, x)
+#define ___fill_fmt2(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt1(ptr, __VA_ARGS__)
+#define ___fill_fmt3(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt2(ptr, __VA_ARGS__)
+#define ___fill_fmt4(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt3(ptr, __VA_ARGS__)
+#define ___fill_fmt5(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt4(ptr, __VA_ARGS__)
+#define ___fill_fmt6(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt5(ptr, __VA_ARGS__)
+#define ___fill_fmt7(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt6(ptr, __VA_ARGS__)
+#define ___fill_fmt8(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt7(ptr, __VA_ARGS__)
+#define ___fill_fmt9(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt8(ptr, __VA_ARGS__)
+#define ___fill_fmt10(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt9(ptr, __VA_ARGS__)
+#define ___fill_fmt11(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt10(ptr, __VA_ARGS__)
+#define ___fill_fmt12(ptr, x, ...) ___fill_pr_fmt(ptr, x); ___fill_fmt11(ptr, __VA_ARGS__)
 
-#define ___fill_fmt(arr, ...)\
-	___apply(___fill_fmt, ___narg(__VA_ARGS__))(arr, __VA_ARGS__)
+#define ___fill_fmt(ptr, ...)\
+	___apply(___fill_fmt, ___narg(__VA_ARGS__))(ptr, __VA_ARGS__)
 
 #define fprint(fp, ...) ({\
 	char ___fmt[___narg(__VA_ARGS__)*4 + 1];\
