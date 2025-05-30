@@ -16,18 +16,18 @@
 #endif
 
 #define ___fill0(ptr, p)
-#define ___fill1(ptr, p, x) ptr[p] = x
-#define ___fill2(ptr, p, x, ...) ptr[p] = x; ___fill1(ptr, p + 1, __VA_ARGS__)
-#define ___fill3(ptr, p, x, ...) ptr[p] = x; ___fill2(ptr, p + 1, __VA_ARGS__)
-#define ___fill4(ptr, p, x, ...) ptr[p] = x; ___fill3(ptr, p + 1, __VA_ARGS__)
-#define ___fill5(ptr, p, x, ...) ptr[p] = x; ___fill4(ptr, p + 1, __VA_ARGS__)
-#define ___fill6(ptr, p, x, ...) ptr[p] = x; ___fill5(ptr, p + 1, __VA_ARGS__)
-#define ___fill7(ptr, p, x, ...) ptr[p] = x; ___fill6(ptr, p + 1, __VA_ARGS__)
-#define ___fill8(ptr, p, x, ...) ptr[p] = x; ___fill7(ptr, p + 1, __VA_ARGS__)
-#define ___fill9(ptr, p, x, ...) ptr[p] = x; ___fill8(ptr, p + 1, __VA_ARGS__)
-#define ___fill10(ptr, p, x, ...) ptr[p] = x; ___fill9(ptr, p + 1, __VA_ARGS__)
-#define ___fill11(ptr, p, x, ...) ptr[p] = x; ___fill10(ptr, p + 1, __VA_ARGS__)
-#define ___fill12(ptr, p, x, ...) ptr[p] = x; ___fill11(ptr, p + 1, __VA_ARGS__)
+#define ___fill1(ptr, p, x) (ptr)[p] = (x)
+#define ___fill2(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill1(ptr, p + 1, __VA_ARGS__)
+#define ___fill3(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill2(ptr, p + 1, __VA_ARGS__)
+#define ___fill4(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill3(ptr, p + 1, __VA_ARGS__)
+#define ___fill5(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill4(ptr, p + 1, __VA_ARGS__)
+#define ___fill6(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill5(ptr, p + 1, __VA_ARGS__)
+#define ___fill7(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill6(ptr, p + 1, __VA_ARGS__)
+#define ___fill8(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill7(ptr, p + 1, __VA_ARGS__)
+#define ___fill9(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill8(ptr, p + 1, __VA_ARGS__)
+#define ___fill10(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill9(ptr, p + 1, __VA_ARGS__)
+#define ___fill11(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill10(ptr, p + 1, __VA_ARGS__)
+#define ___fill12(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill11(ptr, p + 1, __VA_ARGS__)
 
 #define ___fill(ptr, ...)\
 	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
@@ -107,7 +107,7 @@ static inline size_t len(void *ptr)
 	return *len_ptr & ~___HAS_USED_MASK;
 }
 
-#define ___alloc_tbl(pptr, len) ({\
+#define ___alloc_table(pptr, len) ({\
 	size_t ___len = len;\
 	*(pptr) = malloc(___user_sz(*(pptr), ___len) + ___meta_used_sz(___len) + ___meta_len_sz());\
 	size_t ___cap = ___cap(*(pptr));\
@@ -144,14 +144,19 @@ static inline size_t ___align_sz(size_t nb)
 	return nb + 1;
 }
 
-#define ___extend(ptr, len) ptr = realloc(ptr, ___align_sz(___user_sz(ptr, len) + ___meta_len_sz()))
-
 #define append(pptr, ...) ({\
-	size_t ___len = len(*(pptr));\
-	___extend(*(pptr), ___len + ___narg(__VA_ARGS__));\
-	___fill((*(pptr) + ___len), ##__VA_ARGS__);\
-	size_t *___len_ptr = ___meta_len_ptr(*(pptr), ___cap(*(pptr)));\
-	*___len_ptr = ___len + ___narg(__VA_ARGS__);\
+	ssize_t ___old_len = len(*(pptr));\
+	ssize_t ___new_len = ___old_len + ___narg(__VA_ARGS__);\
+	size_t ___sz = ___align_sz(___user_sz(*(pptr), ___new_len) + ___meta_len_sz());\
+	typeof(*(pptr)) ___ptr = realloc(*(pptr), ___sz);\
+	if (___ptr) {\
+		___fill(___ptr + ___old_len, ##__VA_ARGS__);\
+		*___meta_len_ptr(___ptr, ___cap(___ptr)) = ___new_len;\
+		*(pptr) = ___ptr;\
+	} else {\
+		___new_len = 0;\
+	}\
+	___new_len - 1;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
