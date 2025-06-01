@@ -108,23 +108,23 @@ static inline size_t len(void *ptr)
 }
 
 #define ___alloc_table(pptr, len) ({\
-	size_t ___len = len;\
-	*(pptr) = malloc(___user_sz(*(pptr), ___len) + ___meta_used_sz(___len) + ___meta_len_sz());\
-	size_t ___cap = ___cap(*(pptr));\
-	size_t *___len_ptr = ___meta_len_ptr(*(pptr), ___cap);\
-	*___len_ptr = ___len | ___HAS_USED_MASK;\
-	unsigned long *___used_ptr = ___meta_used_ptr(*(pptr), ___cap);\
-	memset(___used_ptr, 0, ___meta_used_sz(___len));\
+	size_t new_len = len;\
+	*(pptr) = malloc(___user_sz(*(pptr), new_len) + ___meta_used_sz(new_len) + ___meta_len_sz());\
+	size_t cap = ___cap(*(pptr));\
+	size_t *len_ptr = ___meta_len_ptr(*(pptr), cap);\
+	*len_ptr = new_len | ___HAS_USED_MASK;\
+	unsigned long *used_ptr = ___meta_used_ptr(*(pptr), cap);\
+	memset(used_ptr, 0, ___meta_used_sz(new_len));\
 })
 
 #define ___meta_used_test(ptr, slot) ({\
-	unsigned long *___used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
-	test_bit(slot, ___used_ptr);\
+	unsigned long *used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
+	test_bit(slot, used_ptr);\
 })
 
 #define ___meta_used_set(ptr, slot) ({\
-	unsigned long *___used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
-	set_bit(slot, ___used_ptr);\
+	unsigned long *used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
+	set_bit(slot, used_ptr);\
 })
 
 static inline size_t ___align_sz(size_t nb)
@@ -145,18 +145,18 @@ static inline size_t ___align_sz(size_t nb)
 }
 
 #define append(pptr, ...) ({\
-	ssize_t ___old_len = len(*(pptr));\
-	ssize_t ___new_len = ___old_len + ___narg(__VA_ARGS__);\
-	size_t ___sz = ___align_sz(___user_sz(*(pptr), ___new_len) + ___meta_len_sz());\
-	typeof(*(pptr)) ___ptr = realloc(*(pptr), ___sz);\
-	if (___ptr) {\
-		___fill(___ptr + ___old_len, ##__VA_ARGS__);\
-		*___meta_len_ptr(___ptr, ___cap(___ptr)) = ___new_len;\
-		*(pptr) = ___ptr;\
+	ssize_t old_len = len(*(pptr));\
+	ssize_t new_len = old_len + ___narg(__VA_ARGS__);\
+	size_t sz = ___align_sz(___user_sz(*(pptr), new_len) + ___meta_len_sz());\
+	typeof(*(pptr)) ptr = realloc(*(pptr), sz);\
+	if (ptr) {\
+		___fill(ptr + old_len, ##__VA_ARGS__);\
+		*___meta_len_ptr(ptr, ___cap(ptr)) = new_len;\
+		*(pptr) = ptr;\
 	} else {\
-		___new_len = 0;\
+		new_len = 0;\
 	}\
-	___new_len - 1;\
+	new_len - 1;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
@@ -198,31 +198,31 @@ static inline size_t ___align_sz(size_t nb)
 	___apply(___fill_fmt, ___narg(__VA_ARGS__))(ptr, __VA_ARGS__)
 
 #define fprint(fp, ...) ({\
-	char ___fmt[___narg(__VA_ARGS__)*4 + 1];\
-	char *___dst = ___fmt;\
-	___fill_fmt(___dst, __VA_ARGS__);\
-	*___dst++ = '\0';\
-	fprintf(fp, ___fmt, ##__VA_ARGS__);\
+	char fmt[___narg(__VA_ARGS__)*4 + 1];\
+	char *dst = fmt;\
+	___fill_fmt(dst, __VA_ARGS__);\
+	*dst++ = '\0';\
+	fprintf(fp, fmt, ##__VA_ARGS__);\
 })
 
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
 #define fprintln(fp, ...) ({\
-	char ___fmt[___narg(__VA_ARGS__)*4 + 2];\
-	char *___dst = ___fmt;\
-	___fill_fmt(___dst, __VA_ARGS__);\
-	*___dst++ = '\n';\
-	*___dst++ = '\0';\
-	fprintf(fp, ___fmt, ##__VA_ARGS__);\
+	char fmt[___narg(__VA_ARGS__)*4 + 2];\
+	char *dst = fmt;\
+	___fill_fmt(dst, __VA_ARGS__);\
+	*dst++ = '\n';\
+	*dst++ = '\0';\
+	fprintf(fp, fmt, ##__VA_ARGS__);\
 })
 
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
 #define join(...) ({\
-	char ___fmt[___narg(__VA_ARGS__)*4 + 1];\
-	char *___dst = ___fmt;\
-	___fill_fmt(___dst, __VA_ARGS__);\
-	*___dst++ = '\0';\
+	char fmt[___narg(__VA_ARGS__)*4 + 1];\
+	char *dst = fmt;\
+	___fill_fmt(dst, __VA_ARGS__);\
+	*dst++ = '\0';\
 	size_t nb = snprintf(NULL, 0, ___fmt, __VA_ARGS__);\
 	char *buf = malloc(nb + 1);\
 	if (buf) sprintf(buf, ___fmt, __VA_ARGS__);\
