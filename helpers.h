@@ -146,11 +146,11 @@ static inline size_t ___align_sz(size_t nb)
 
 #define append(pptr, ...) ({\
 	ssize_t old_len = len(*(pptr));\
-	ssize_t new_len = old_len + ___narg(__VA_ARGS__);\
+	ssize_t new_len = old_len + 1;\
 	size_t sz = ___align_sz(___user_sz(*(pptr), new_len) + ___meta_len_sz());\
 	typeof(*(pptr)) ptr = realloc(*(pptr), sz);\
 	if (ptr) {\
-		___fill(ptr + old_len, ##__VA_ARGS__);\
+		*(ptr + old_len) = (typeof(*ptr))__VA_ARGS__;\
 		*___meta_len_ptr(ptr, ___cap(ptr)) = new_len;\
 		*(pptr) = ptr;\
 	} else {\

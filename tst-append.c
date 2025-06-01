@@ -1,16 +1,10 @@
 #include "helpers.h"
 
-static void walk(int *nums)
-{
-	print("len=", len(nums), ":");
-	for (int i = 0; i < len(nums); i++)
-		print(" ", nums[i]);
-	println();
-}
-
 struct unit {
 	int id;
-	int data;
+	int data1;
+	int data2;
+	int data3;
 };
 
 int main()
@@ -18,20 +12,32 @@ int main()
 	int *nums = NULL;
 
 	append(&nums, 1);
-	append(&nums, 2, 3);
-	append(&nums, 4, 5, 6);
-	append(&nums, 7, 8, 9, 10);
-	append(&nums, 11, 12, 13, 14, 15);
-	append(&nums, 16, 17, 18, 19, 20, 21);
-	append(&nums, 22, 23, 24, 25, 26, 27, 28);
-	ssize_t x = append(&nums, 29, 30, 31, 32, 33, 34, 35, 36);
+	append(&nums, 2);
+	append(&nums, 3);
+	append(&nums, 4);
+	append(&nums, 5);
+	append(&nums, 6);
+	append(&nums, 7);
+	append(&nums, 8);
+	ssize_t id = append(&nums, 11);
 
-	walk(nums);
-	println(x);
+	print("len=", len(nums), ":");
+	for (int i = 0; i < len(nums); i++)
+		print(" ", nums[i]);
+	println();
+	println("id=", id);
 
 	struct unit *units = NULL;
 
-	append(&units, ((struct unit){1, 11}));
+	append(&units, {0});
+	append(&units, {1, 11});
+	append(&units, {2, 22, 222});
+	append(&units, {3, 33, 333, 3333});
+
+	print("len=", len(units), ":");
+	for (int i = 0; i < len(units); i++)
+		print(" ", units[i].data1);
+	println();
 
 	return 0;
 }
