@@ -78,7 +78,7 @@ static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 #define ___defer_free __attribute__((__cleanup__(___pfree)))
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
-void ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
+static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define zfree(ptr) __zfree((void **)(ptr))
 
 #define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
@@ -223,9 +223,9 @@ static inline size_t ___align_sz(size_t nb)
 	char *dst = fmt;\
 	___fill_fmt(dst, __VA_ARGS__);\
 	*dst++ = '\0';\
-	size_t nb = snprintf(NULL, 0, ___fmt, __VA_ARGS__);\
+	size_t nb = snprintf(NULL, 0, fmt, __VA_ARGS__);\
 	char *buf = malloc(nb + 1);\
-	if (buf) sprintf(buf, ___fmt, __VA_ARGS__);\
+	if (buf) sprintf(buf, fmt, __VA_ARGS__);\
 	buf;\
 })
 #define ___strto(x, s) ({\
