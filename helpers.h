@@ -79,7 +79,7 @@ static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
-#define zfree(ptr) __zfree((void **)(ptr))
+#define zfree(ptr) ___zfree((void **)(ptr))
 
 #define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
 #define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
