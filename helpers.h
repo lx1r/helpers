@@ -218,6 +218,25 @@ static inline size_t ___align_sz(size_t nb)
 
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
+#define fprintv(fp, slots, len) ({ do {\
+	size_t n = (len);\
+	if (n == 0) break;\
+	char fmt[4 + 2 + 1];\
+	char *dst = fmt;\
+	___fill_pr_fmt(dst, (slots)[0]);\
+	*dst = '\0';\
+	fprintf(fp, fmt, (slots)[0]);\
+	if (n == 1) break;\
+	dst = fmt;\
+	*dst++ = ',';\
+	*dst++ = ' ';\
+	___fill_pr_fmt(dst, (slots)[0]);\
+	*dst = '\0';\
+	for (size_t i = 1; i < n; i++) {\
+		fprintf(fp, fmt, (slots)[i]);\
+	}\
+} while(0); })
+
 #define join(...) ({\
 	char fmt[___narg(__VA_ARGS__)*4 + 1];\
 	char *dst = fmt;\
@@ -228,6 +247,7 @@ static inline size_t ___align_sz(size_t nb)
 	if (buf) sprintf(buf, fmt, __VA_ARGS__);\
 	buf;\
 })
+
 #define ___strto(x, s) ({\
 	const char *str = s;\
 	(str) ? \
