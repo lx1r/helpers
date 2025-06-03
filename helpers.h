@@ -73,7 +73,10 @@ static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
 #include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
+#include <unistd.h>
 
+static inline void ___pclose(int *pfd) { close(*pfd); }
+static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 #define __defer(func) __attribute__((__cleanup__(___p##func)))
 
@@ -107,7 +110,7 @@ static inline size_t len(void *ptr)
 	return *len_ptr & ~___HAS_USED_MASK;
 }
 
-#define ___alloc_table(pptr, len) ({\
+#define reserve(pptr, len) ({\
 	size_t new_len = len;\
 	*(pptr) = malloc(___user_sz(*(pptr), new_len) + ___meta_used_sz(new_len) + ___meta_len_sz());\
 	size_t cap = ___cap(*(pptr));\
@@ -302,16 +305,16 @@ static inline size_t ___align_sz(size_t nb)
 
 static inline int splitb(const char *str, const char *delim, const char **tokens, int n, unsigned long *bits)
 {
-        char __defer(free) *dup = strdup(str);
-        if (!dup)
-                return -1;
+	char __defer(free) *dup = strdup(str);
+	if (!dup)
+		return -1;
 
-        for (char *token = strtok(dup, delim); token; token = strtok(NULL, delim)) {
-                for (int i = 0; i < n; i++)
-                        if (strcmp(token, tokens[i]) == 0)
-                                set_bit(i, bits);
-        }
-        return 0;
+	for (char *token = strtok(dup, delim); token; token = strtok(NULL, delim)) {
+		for (int i = 0; i < n; i++)
+			if (strcmp(token, tokens[i]) == 0)
+				set_bit(i, bits);
+	}
+	return 0;
 }
 
 #define ___decl1(x) x;

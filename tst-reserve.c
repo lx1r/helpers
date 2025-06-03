@@ -10,7 +10,7 @@ int main()
 	println("ALIGN_DOWN(40)=", ALIGN_DOWN(40, sizeof(unsigned long)));
 
 	int *nums;
-	___alloc_table(&nums, 20);
+	reserve(&nums, 20);
 	println("len(nums)=", len(nums));
 
 	for (int i = 0; i < len(nums); i++) {
