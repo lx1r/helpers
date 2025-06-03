@@ -75,7 +75,7 @@ static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
 #include <string.h>
 
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
-#define ___defer_free __attribute__((__cleanup__(___pfree)))
+#define __defer(func) __attribute__((__cleanup__(___p##func)))
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
@@ -237,6 +237,8 @@ static inline size_t ___align_sz(size_t nb)
 	}\
 } while(0); })
 
+#define printv(tokens, n) fprintv(stdout, tokens, n)
+
 #define join(...) ({\
 	char fmt[___narg(__VA_ARGS__)*4 + 1];\
 	char *dst = fmt;\
@@ -293,11 +295,24 @@ static inline size_t ___align_sz(size_t nb)
 #define ___split12(str, delim, p, ...) ___splitn(str, delim, p); ___split11(str, delim, __VA_ARGS__)
 
 #define split(str, delim, p, ...) ({\
-	char *dup = strdup(str);\
+	char __defer(free) *dup = strdup(str);\
 	*(p) = ___strto(*(p), strtok(dup, delim));\
 	___apply(___split, ___narg(p, __VA_ARGS__))(dup, delim, ##__VA_ARGS__);\
-	free(dup);\
 })
+
+static inline int splitb(const char *str, const char *delim, const char **tokens, int n, unsigned long *bits)
+{
+        char __defer(free) *dup = strdup(str);
+        if (!dup)
+                return -1;
+
+        for (char *token = strtok(dup, delim); token; token = strtok(NULL, delim)) {
+                for (int i = 0; i < n; i++)
+                        if (strcmp(token, tokens[i]) == 0)
+                                set_bit(i, bits);
+        }
+        return 0;
+}
 
 #define ___decl1(x) x;
 #define ___decl2(x, ...) x; ___decl1(__VA_ARGS__)
