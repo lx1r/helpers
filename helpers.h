@@ -110,25 +110,36 @@ static inline size_t len(void *ptr)
 	return *len_ptr & ~___HAS_USED_MASK;
 }
 
+static inline void *___reserve(size_t len, size_t sz)
+{
+	void *ptr = malloc(sz*len + ___meta_used_sz(len) + ___meta_len_sz());
+	if (!ptr)
+		return NULL;
+	size_t cap = ___cap(ptr);
+	size_t *len_ptr = ___meta_len_ptr(ptr, cap);
+	*len_ptr = len | ___HAS_USED_MASK;
+	unsigned long *used_ptr = ___meta_used_ptr(ptr, cap);
+	memset(used_ptr, 0, ___meta_used_sz(len));
+	return ptr;
+}
+
 #define reserve(pptr, len) ({\
-	size_t new_len = len;\
-	*(pptr) = malloc(___user_sz(*(pptr), new_len) + ___meta_used_sz(new_len) + ___meta_len_sz());\
-	size_t cap = ___cap(*(pptr));\
-	size_t *len_ptr = ___meta_len_ptr(*(pptr), cap);\
-	*len_ptr = new_len | ___HAS_USED_MASK;\
-	unsigned long *used_ptr = ___meta_used_ptr(*(pptr), cap);\
-	memset(used_ptr, 0, ___meta_used_sz(new_len));\
+	*(pptr) = ___reserve(len, sizeof(*(pptr)));\
 })
 
 #define ___meta_used_test(ptr, slot) ({\
-	unsigned long *used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
-	test_bit(slot, used_ptr);\
+	test_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
 })
 
 #define ___meta_used_set(ptr, slot) ({\
-	unsigned long *used_ptr = ___meta_used_ptr(ptr, ___cap(ptr));\
-	set_bit(slot, used_ptr);\
+	set_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
 })
+
+#define ___meta_used_clear(ptr, slot) ({\
+	clear_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
+})
+
+#define used(ptr, slot) ___meta_used_test(ptr, slot)
 
 static inline size_t ___align_sz(size_t nb)
 {
@@ -160,6 +171,140 @@ static inline size_t ___align_sz(size_t nb)
 		new_len = 0;\
 	}\
 	new_len - 1;\
+})
+
+static inline unsigned long ___hnv1a(const void *key, size_t len) {
+	unsigned long hash = 14695981039346656037UL;
+	for (int i = 0; i < len; i++) {
+		hash ^= ((unsigned char *)key)[i];
+		hash *= 1099511628211UL;
+	}
+	return hash;
+}
+
+static inline unsigned long ___hnv1az(const char *key) {
+	unsigned long hash = 14695981039346656037UL;
+	for (const char *p = key; *p; p++) {
+		hash ^= *(unsigned char *)p;
+		hash *= 1099511628211UL;
+	}
+	return hash;
+}
+
+#define ___hash(key) \
+	_Generic(key,\
+		 _Bool:                 ___hnv1a(&(key), sizeof(typeof(key))),\
+		 char:                  ___hnv1a(&(key), sizeof(typeof(key))),\
+		 signed char:           ___hnv1a(&(key), sizeof(typeof(key))),\
+		 unsigned char:         ___hnv1a(&(key), sizeof(typeof(key))),\
+		 signed short:          ___hnv1a(&(key), sizeof(typeof(key))),\
+		 unsigned short:        ___hnv1a(&(key), sizeof(typeof(key))),\
+		 signed int:            ___hnv1a(&(key), sizeof(typeof(key))),\
+		 unsigned int:          ___hnv1a(&(key), sizeof(typeof(key))),\
+		 signed long:           ___hnv1a(&(key), sizeof(typeof(key))),\
+		 unsigned long:         ___hnv1a(&(key), sizeof(typeof(key))),\
+		 signed long long:      ___hnv1a(&(key), sizeof(typeof(key))),\
+		 unsigned long long:    ___hnv1a(&(key), sizeof(typeof(key))),\
+		 float:                 ___hnv1a(&(key), sizeof(typeof(key))),\
+		 double:                ___hnv1a(&(key), sizeof(typeof(key))),\
+		 long double:           ___hnv1a(&(key), sizeof(typeof(key))),\
+		 char *:                ___hnv1az((char *)(unsigned long)(key)),\
+		 const char *:          ___hnv1az((char *)(unsigned long)(key)),\
+		 default:               ___hnv1a(&(key), sizeof(typeof(key))))
+
+#define ___cmpr(a, b) \
+	_Generic(a,\
+		 _Bool:                 (a) - (b),\
+		 char:                  (a) - (b),\
+		 signed char:           (a) - (b),\
+		 unsigned char:         (a) - (b),\
+		 signed short:          (a) - (b),\
+		 unsigned short:        (a) - (b),\
+		 signed int:            (a) - (b),\
+		 unsigned int:          (a) - (b),\
+		 signed long:           (a) - (b),\
+		 unsigned long:         (a) - (b),\
+		 signed long long:      (a) - (b),\
+		 unsigned long long:    (a) - (b),\
+		 float:                 (a) - (b),\
+		 double:                (a) - (b),\
+		 long double:           (a) - (b),\
+		 char *:                strcmp((char *)(unsigned long)a, (char *)(unsigned long)b),\
+		 const char *:          strcmp((char *)(unsigned long)a, (char *)(unsigned long)b),\
+		 default:               memcmp(&a, &b, sizeof(a)))
+
+//___step(len) (len+3)/6
+#define ___STEP (5)
+
+static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
+{
+	for (size_t i = 0; i < len; i += ___STEP) {
+		ssize_t slot = (hash + i) % len;
+		if (used(ptr, slot) == false)
+			return slot;
+	}
+	return -1;
+}
+
+#define ___rehash(pptr, old_len, new_len) ({\
+	typeof(*(pptr)) old = *(pptr);\
+	typeof(*(pptr)) new = ___reserve(new_len, sizeof(*(pptr)));\
+	printf("new_len=%ld\n", new_len);\
+	for (size_t i = 0; i < old_len; i++) {\
+		if (!used(old, i)) continue;\
+		size_t slot = ___probe(new, new_len, ___hash(old[i].key));\
+		if (slot != -1) {\
+			new[slot].key = old[i].key;\
+			new[slot].data = old[i].data;\
+			___meta_used_set(new, slot);\
+		} else {\
+			free(new);/*assert*/\
+			new = NULL;\
+			break;\
+		}\
+	}\
+	free(old);\
+	*(pptr) = new;\
+})\
+
+#define mapof(ktype, dtype) struct { ktype key; dtype data; }
+
+#define insert(pptr, k, ...) ({\
+	ssize_t slot = -1;\
+	typeof((*(pptr))->key) ___k = k;\
+	if (!*(pptr)) reserve(pptr, 32);\
+	while (*(pptr)) {\
+		typeof(*(pptr)) ptr = *(pptr);\
+		size_t cap = len(ptr);\
+		ssize_t slot = ___probe(ptr, cap, ___hash(___k));\
+		if (slot != -1) {\
+			ptr[slot].key = ___k;\
+			ptr[slot].data = (typeof(ptr->data))__VA_ARGS__;\
+			___meta_used_set(ptr, slot);\
+			break;\
+		}\
+		___rehash(pptr, cap, 2*cap);\
+	}\
+	slot;\
+})
+
+#define delete(pptr, slot) ({\
+	___meta_used_clear(*(pptr), slot);\
+})
+
+#define lookup(pptr, k) ({\
+	ssize_t slot = -1;\
+	typeof(*(pptr)) ptr = *(pptr);\
+	typeof((*(pptr))->key) ___k = k;\
+	size_t cap = len(ptr);\
+	unsigned long hash = ___hash(___k);\
+	for (size_t i = 0; i < cap; i += ___STEP) {\
+		slot = (hash + i) % cap;\
+		if (used(ptr, slot) && ___cmpr(ptr[slot].key, ___k) == 0) {\
+			break;\
+		}\
+	}\
+	slot;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
