@@ -227,21 +227,6 @@ static inline unsigned long ___hnv1az(const char *key) {
 
 #define ___hash(key) \
 	_Generic(key,\
-		 _Bool:                 ___hnv1a(&(key), sizeof(typeof(key))),\
-		 char:                  ___hnv1a(&(key), sizeof(typeof(key))),\
-		 signed char:           ___hnv1a(&(key), sizeof(typeof(key))),\
-		 unsigned char:         ___hnv1a(&(key), sizeof(typeof(key))),\
-		 signed short:          ___hnv1a(&(key), sizeof(typeof(key))),\
-		 unsigned short:        ___hnv1a(&(key), sizeof(typeof(key))),\
-		 signed int:            ___hnv1a(&(key), sizeof(typeof(key))),\
-		 unsigned int:          ___hnv1a(&(key), sizeof(typeof(key))),\
-		 signed long:           ___hnv1a(&(key), sizeof(typeof(key))),\
-		 unsigned long:         ___hnv1a(&(key), sizeof(typeof(key))),\
-		 signed long long:      ___hnv1a(&(key), sizeof(typeof(key))),\
-		 unsigned long long:    ___hnv1a(&(key), sizeof(typeof(key))),\
-		 float:                 ___hnv1a(&(key), sizeof(typeof(key))),\
-		 double:                ___hnv1a(&(key), sizeof(typeof(key))),\
-		 long double:           ___hnv1a(&(key), sizeof(typeof(key))),\
 		 char *:                ___hnv1az((char *)(unsigned long)(key)),\
 		 const char *:          ___hnv1az((char *)(unsigned long)(key)),\
 		 default:               ___hnv1a(&(key), sizeof(typeof(key))))
