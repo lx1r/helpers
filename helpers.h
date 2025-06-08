@@ -90,15 +90,32 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define ___meta_len_sz()	sizeof(size_t)
 #define ___meta_used_sz(len)	((BIT_WORD((len) - 1) + 1) * sizeof(unsigned long))
 
-static inline size_t *___meta_len_ptr(void *ptr, size_t cap)
+static inline size_t *___meta_len_ptr(void *ptr)
 {
-	return ptr + cap - ___meta_len_sz();
+	return ptr + ___cap(ptr) - ___meta_len_sz();
 }
 
-static inline unsigned long *___meta_used_ptr(void *ptr, size_t cap)
+static inline size_t ___meta_len(size_t *len_ptr)
 {
-	size_t *len_ptr = ___meta_len_ptr(ptr, cap);
-	size_t len = *len_ptr & ~___HAS_USED_MASK;
+	return *len_ptr & ~___HAS_USED_MASK;
+}
+
+static inline bool ___meta_has_used(size_t *len_ptr)
+{
+	return !!(*len_ptr & ___HAS_USED_MASK);
+}
+
+static inline void ___meta_set_len(size_t *len_ptr, size_t len, bool has_used)
+{
+	*len_ptr = len;
+	if (has_used) *len_ptr |= ___HAS_USED_MASK;
+}
+
+static inline unsigned long *___meta_used_ptr(void *len_ptr)
+{
+	if (!___meta_has_used(len_ptr))
+		return NULL;
+	size_t len = ___meta_len(len_ptr);
 	return (void *)len_ptr - ___meta_used_sz(len);
 }
 
@@ -106,37 +123,67 @@ static inline size_t len(void *ptr)
 {
 	if (!ptr)
 		return 0;
-	size_t *len_ptr = ___meta_len_ptr(ptr, ___cap(ptr));
-	return *len_ptr & ~___HAS_USED_MASK;
+	size_t *len_ptr = ___meta_len_ptr(ptr);
+	return ___meta_len(len_ptr);
 }
 
-static inline void *___reserve(size_t len, size_t sz)
+static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
+{
+	unsigned long *prev_used_ptr = NULL;
+	size_t prev_used_sz = 0;
+
+	if (ptr) {
+		size_t *len_ptr = ___meta_len_ptr(ptr);
+		prev_used_ptr = ___meta_used_ptr(len_ptr);
+		prev_used_sz = ___meta_used_sz(___meta_len(len_ptr));
+	}
+
+	ptr = realloc(ptr, sz*len + ___meta_used_sz(len) + ___meta_len_sz());
+	if (!ptr)
+		return NULL;
+
+	size_t *len_ptr = ___meta_len_ptr(ptr);
+	___meta_set_len(len_ptr, len, has_used);
+	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
+
+	if (prev_used_ptr)
+		memmove(used_ptr, prev_used_ptr, prev_used_sz);
+	if (has_used)
+		memset(used_ptr + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
+
+	return ptr;
+}
+
+static inline void *___reserve(size_t len, size_t sz, bool has_used)
 {
 	void *ptr = malloc(sz*len + ___meta_used_sz(len) + ___meta_len_sz());
 	if (!ptr)
 		return NULL;
-	size_t cap = ___cap(ptr);
-	size_t *len_ptr = ___meta_len_ptr(ptr, cap);
-	*len_ptr = len | ___HAS_USED_MASK;
-	unsigned long *used_ptr = ___meta_used_ptr(ptr, cap);
-	memset(used_ptr, 0, ___meta_used_sz(len));
+
+	size_t *len_ptr = ___meta_len_ptr(ptr);
+	___meta_set_len(len_ptr, len, has_used);
+	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
+
+	if (has_used)
+		memset(used_ptr, 0, ___meta_used_sz(len));
+
 	return ptr;
 }
 
 #define reserve(pptr, len) ({\
-	*(pptr) = ___reserve(len, sizeof(*(pptr)));\
+	*(pptr) = ___reserve(len, sizeof(*(pptr)), true);\
 })
 
 #define ___meta_used_test(ptr, slot) ({\
-	test_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
+	test_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
 })
 
 #define ___meta_used_set(ptr, slot) ({\
-	set_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
+	set_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
 })
 
 #define ___meta_used_clear(ptr, slot) ({\
-	clear_bit(slot, ___meta_used_ptr(ptr, ___cap(ptr)));\
+	clear_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
 })
 
 #define used(ptr, slot) ___meta_used_test(ptr, slot)
@@ -159,18 +206,17 @@ static inline size_t ___align_sz(size_t nb)
 }
 
 #define append(pptr, ...) ({\
-	ssize_t old_len = len(*(pptr));\
-	ssize_t new_len = old_len + 1;\
-	size_t sz = ___align_sz(___user_sz(*(pptr), new_len) + ___meta_len_sz());\
+	ssize_t cap = len(*(pptr)) + 1;\
+	size_t sz = ___align_sz(___user_sz(*(pptr), cap) + ___meta_len_sz());\
 	typeof(*(pptr)) ptr = realloc(*(pptr), sz);\
 	if (ptr) {\
-		*(ptr + old_len) = (typeof(*ptr))__VA_ARGS__;\
-		*___meta_len_ptr(ptr, ___cap(ptr)) = new_len;\
+		ptr[cap - 1] = (typeof(*ptr))__VA_ARGS__;\
+		*___meta_len_ptr(ptr) = cap;\
 		*(pptr) = ptr;\
 	} else {\
-		new_len = 0;\
+		cap = 0;\
 	}\
-	new_len - 1;\
+	cap - 1;\
 })
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
@@ -248,7 +294,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 
 #define ___rehash(pptr, old_len, new_len) ({\
 	typeof(*(pptr)) old = *(pptr);\
-	typeof(*(pptr)) new = ___reserve(new_len, sizeof(*(pptr)));\
+	typeof(*(pptr)) new = ___reserve(new_len, sizeof(*(pptr)), true);\
 	printf("new_len=%ld\n", new_len);\
 	for (size_t i = 0; i < old_len; i++) {\
 		if (!used(old, i)) continue;\
