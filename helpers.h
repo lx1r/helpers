@@ -143,36 +143,16 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 		return NULL;
 
 	size_t *len_ptr = ___meta_len_ptr(ptr);
-	___meta_set_len(len_ptr, len, has_used);
+	___meta_set_len(len_ptr, len, has_used || prev_used_ptr);
 	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
 
 	if (prev_used_ptr)
 		memmove(used_ptr, prev_used_ptr, prev_used_sz);
-	if (has_used)
+	if (has_used || prev_used_ptr)
 		memset(used_ptr + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
 
 	return ptr;
 }
-
-static inline void *___reserve(size_t len, size_t sz, bool has_used)
-{
-	void *ptr = malloc(sz*len + ___meta_used_sz(len) + ___meta_len_sz());
-	if (!ptr)
-		return NULL;
-
-	size_t *len_ptr = ___meta_len_ptr(ptr);
-	___meta_set_len(len_ptr, len, has_used);
-	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
-
-	if (has_used)
-		memset(used_ptr, 0, ___meta_used_sz(len));
-
-	return ptr;
-}
-
-#define reserve(pptr, len) ({\
-	*(pptr) = ___reserve(len, sizeof(*(pptr)), true);\
-})
 
 #define ___meta_used_test(ptr, slot) ({\
 	test_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
@@ -187,6 +167,14 @@ static inline void *___reserve(size_t len, size_t sz, bool has_used)
 })
 
 #define used(ptr, slot) ___meta_used_test(ptr, slot)
+
+#define reserve(pptr, len) ({\
+	*(pptr) = ___extend(NULL, len, sizeof(*(pptr)), true);\
+})
+
+#define extend(pptr, len) ({\
+	*(pptr) = ___extend(*(pptr), len, sizeof(*(pptr)), true);\
+})
 
 static inline size_t ___align_sz(size_t nb)
 {
@@ -295,7 +283,6 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 #define ___rehash(pptr, old_len, new_len) ({\
 	typeof(*(pptr)) old = *(pptr);\
 	typeof(*(pptr)) new = ___reserve(new_len, sizeof(*(pptr)), true);\
-	printf("new_len=%ld\n", new_len);\
 	for (size_t i = 0; i < old_len; i++) {\
 		if (!used(old, i)) continue;\
 		size_t slot = ___probe(new, new_len, ___hash(old[i].key));\
@@ -318,7 +305,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 #define insert(pptr, k, ...) ({\
 	ssize_t slot = -1;\
 	typeof((*(pptr))->key) ___k = k;\
-	if (!*(pptr)) reserve(pptr, 32);\
+	if (!*(pptr)) reserve(pptr, ___STEP*10);\
 	while (*(pptr)) {\
 		typeof(*(pptr)) ptr = *(pptr);\
 		size_t cap = len(ptr);\
@@ -329,7 +316,8 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 			___meta_used_set(ptr, slot);\
 			break;\
 		}\
-		___rehash(pptr, cap, 2*cap);\
+		printf("new_cap=%zu key=%d\n", 2*cap, ___k);\
+		extend(pptr, 2*cap);\
 	}\
 	slot;\
 })
@@ -339,18 +327,19 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 })
 
 #define lookup(pptr, k) ({\
-	ssize_t slot = -1;\
+	ssize_t ret = -1;\
 	typeof(*(pptr)) ptr = *(pptr);\
 	typeof((*(pptr))->key) ___k = k;\
 	size_t cap = len(ptr);\
 	unsigned long hash = ___hash(___k);\
 	for (size_t i = 0; i < cap; i += ___STEP) {\
-		slot = (hash + i) % cap;\
+		ssize_t slot = (hash + i) % cap;\
 		if (used(ptr, slot) && ___cmpr(ptr[slot].key, ___k) == 0) {\
+			ret = slot;\
 			break;\
 		}\
 	}\
-	slot;\
+	ret;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
