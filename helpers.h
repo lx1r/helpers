@@ -322,15 +322,15 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	slot;\
 })
 
-#define delete(pptr, data_ptr) ({\
+#define delete(pptr, data_ref) ({\
 	typeof(*(pptr)) ptr = *(pptr);\
-	typeof(*(pptr)) ptr_dt = (void *)data_ptr - ((void *)ptr->data - (void *)ptr);\
-	ssize_t slot = ptr_dt - ptr;\
+	typeof(*(pptr)) slot_ptr = (void *)(data_ref) - ((void *)&ptr->data - (void *)ptr);\
+	ssize_t slot = slot_ptr - ptr;\
 	___meta_used_clear(ptr, slot);\
 })
 
 #define lookup(pptr, k) ({\
-	typeof((*(pptr))->data) *ret  = NULL;\
+	typeof((*(pptr))->data) *data_ref  = NULL;\
 	typeof(*(pptr)) ptr = *(pptr);\
 	typeof((*(pptr))->key) ___k = k;\
 	size_t cap = len(ptr);\
@@ -338,11 +338,11 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	for (size_t i = 0; i < cap; i += ___STEP) {\
 		ssize_t slot = (hash + i) % cap;\
 		if (used(ptr, slot) && ___cmpr(ptr[slot].key, ___k) == 0) {\
-			ret = &ptr[slot].data;\
+			data_ref = &ptr[slot].data;\
 			break;\
 		}\
 	}\
-	ret;\
+	data_ref;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\

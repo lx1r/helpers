@@ -22,7 +22,7 @@ int main()
 	}
 	println();
 	for (int i = 0; i < len(nums); i++) {
-		if (___meta_used_test(nums, i))
+		if (used(nums, i))
 			print(i, " ");
 	}
 	println();

@@ -96,5 +96,9 @@ int main()
         find(324);
         find(11111);
 
+	int *data = lookup(&pd, 7);
+	delete(&pd, data);
+	find(7);
+
 	return 0;
 }
