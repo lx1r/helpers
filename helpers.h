@@ -322,12 +322,15 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	slot;\
 })
 
-#define delete(pptr, slot) ({\
-	___meta_used_clear(*(pptr), slot);\
+#define delete(pptr, data_ptr) ({\
+	typeof(*(pptr)) ptr = *(pptr);\
+	typeof(*(pptr)) ptr_dt = (void *)data_ptr - ((void *)ptr->data - (void *)ptr);\
+	ssize_t slot = ptr_dt - ptr;\
+	___meta_used_clear(ptr, slot);\
 })
 
 #define lookup(pptr, k) ({\
-	ssize_t ret = -1;\
+	typeof((*(pptr))->data) *ret  = NULL;\
 	typeof(*(pptr)) ptr = *(pptr);\
 	typeof((*(pptr))->key) ___k = k;\
 	size_t cap = len(ptr);\
@@ -335,7 +338,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	for (size_t i = 0; i < cap; i += ___STEP) {\
 		ssize_t slot = (hash + i) % cap;\
 		if (used(ptr, slot) && ___cmpr(ptr[slot].key, ___k) == 0) {\
-			ret = slot;\
+			ret = &ptr[slot].data;\
 			break;\
 		}\
 	}\

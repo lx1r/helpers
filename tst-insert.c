@@ -12,39 +12,41 @@ void walk()
 
 void find(int key)
 {
-	ssize_t slot = lookup(&pd, key);
-	println("found key=", key, " slot=", slot);
+	int *data = lookup(&pd, key);
+	if (data)
+		println("found key=", key, " data=", *data);
+	else
+		println("key=", key, " not found");
 }
 
 int main()
 {
-	insert(&pd, 1, 11);
-	insert(&pd, 8, 18);
-	insert(&pd, 7, 17);
-	insert(&pd, 4, 14);
-	insert(&pd, 9, 19);
-	insert(&pd, 19, 99);
+	insert(&pd, 1, 1);
+	insert(&pd, 8, 8);
+	insert(&pd, 7, 7);
+	insert(&pd, 4, 4);
+	insert(&pd, 9, 9);
+	insert(&pd, 19, 19);
 
 	walk();
 	find(7);
 
-	insert(&pd, 12, 11);
-	insert(&pd, 83, 18);
-	insert(&pd, 74, 17);
-	insert(&pd, 34, 14);
-	insert(&pd, 29, 19);
-	insert(&pd, 219, 99);
-	insert(&pd, 432, 99);
-	insert(&pd, 56, 99);
-	insert(&pd, 233, 99);
-	insert(&pd, 76, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 32, 99);
-	insert(&pd, 412, 99);
-	insert(&pd, 4534532, 99);
-	insert(&pd, 432342, 99);
-	insert(&pd, 34265, 99);
-	insert(&pd, 32442, 99);
+	insert(&pd, 12, 12);
+	insert(&pd, 83, 83);
+	insert(&pd, 74, 74);
+	insert(&pd, 34, 34);
+	insert(&pd, 29, 29);
+	insert(&pd, 219, 219);
+	insert(&pd, 432, 432);
+	insert(&pd, 56, 56);
+	insert(&pd, 233, 233);
+	insert(&pd, 76, 76);
+	insert(&pd, 32, 32);
+	insert(&pd, 412, 412);
+	insert(&pd, 453, 453);
+	insert(&pd, 432, 432);
+	insert(&pd, 342, 342);
+	insert(&pd, 324, 324);
 
 	insert(&pd, 23, 99);
 	insert(&pd, 23, 99);
@@ -86,13 +88,12 @@ int main()
         find(56);
         find(233);
         find(76);
-        find(23);
         find(32);
         find(412);
-        find(4534532);
-        find(432342);
-        find(34265);
-        find(32442);
+        find(453);
+        find(432);
+        find(342);
+        find(324);
         find(11111);
 
 	return 0;
