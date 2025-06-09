@@ -130,7 +130,6 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 {
 	unsigned long *prev_used_ptr = NULL;
 	size_t prev_used_sz = 0;
-	printf("len=%zu, sz=%zu\n", len, sz);
 
 	if (ptr) {
 		size_t *len_ptr = ___meta_len_ptr(ptr);
@@ -168,8 +167,6 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 	clear_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
 })
 
-//busy and active, occupied
-//#define used(ptr, slot) ___meta_used_test(ptr, slot)
 static inline bool used(void *ptr, ssize_t slot)
 {
 	if (!ptr)
@@ -288,7 +285,6 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 			___meta_used_set(ptr_, slot_);\
 			break;\
 		}\
-		printf("new_len=%zu key=%d\n", 2*len_, key_);\
 		ptr_ = ___extend(ptr_, 2*len_, sizeof(*ptr_), true);\
 	} while (ptr_);\
 	if (ptr_) *(pptr) = ptr_;\

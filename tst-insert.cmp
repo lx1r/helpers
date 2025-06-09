@@ -7,8 +7,6 @@ slot=17 key=4 data=4
 slot=22 key=19 data=19
 slot=29 key=8 data=8
 found key=7 data=7
-new_cap=64 key=23
-new_cap=128 key=23
 len=128
 slot=1 key=76 data=76
 slot=2 key=7 data=7
