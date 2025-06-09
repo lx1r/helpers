@@ -9,7 +9,7 @@ struct unit {
 
 int main()
 {
-	int *nums = NULL;
+	unsigned long *nums = NULL;
 
 	append(&nums, 1);
 	append(&nums, 2);
@@ -19,16 +19,17 @@ int main()
 	append(&nums, 6);
 	append(&nums, 7);
 	append(&nums, 8);
-	ssize_t id = append(&nums, 11);
+	ssize_t ret = append(&nums, 11);
+	println("ret=", ret);
 
-	print("len=", len(nums), ":");
-	for (int i = 0; i < len(nums); i++)
-		print(" ", nums[i]);
+	print("len=", len(nums), ": ");
+	printv(nums, len(nums));
 	println();
-	println("id=", id);
+
+	printb(nums, len(nums)*BITS_PER_LONG);
+	println();
 
 	struct unit *units = NULL;
-
 	append(&units, {0});
 	append(&units, {1, 11});
 	append(&units, {2, 22, 222});
