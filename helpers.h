@@ -203,7 +203,8 @@ static inline size_t ___align_sz(size_t nb)
  * @brief **append()** adds an element to the end of a dynamic array,
  * expands memory usage if necessary
  * @param pptr pointer to the dynamic array, may be any type
- * @param init initializer for a new array element
+ * @param init initializer for a new array element, may be an aggregate
+ * initializer list
  * @return index in the array where the new value is appended
  */
 #define append(pptr, ...) ({\
@@ -282,9 +283,11 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 /**
  * @brief **insert()** adds an element to a dynamic associative array,
  * expands memory usage if necessary
- * @param pptr pointer to the associative array, may be declared using `mapof` macro
+ * @param pptr pointer to the associative array, may be declared using
+ * `mapof` macro
  * @param key associative array index value, maybe any standard type
- * @param init initializer for a new data element
+ * @param init initializer for a new data element, may be an aggregate
+ * initializer list
  * @return index in the array where the new value is inserted,
  * the index is valid until any method of the associative array is called
  */
@@ -313,7 +316,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * @param data_ref reference to a data associated with a key in the array,
  * can be returned by `lookup()` method
  * @return index in the array that `data_ref` belonged to
- * the index is valid until any method of the associative array is called
+ * the index is valid until any associative array method is called
  */
 #define delete(pptr, data_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
@@ -328,8 +331,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * @param pptr pointer to the associative array
  * @param key associative array key value
  * @return reference to the data that the `key` is associated with,
- * the reference is valid until any method of the associative
- * array is called
+ * the reference is valid until any associative array method is called
  */
 #define lookup(pptr, k) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
@@ -340,9 +342,15 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	size_t free_slot_ = -1;\
 	for (size_t i_ = 0; i_ < len_; i_ += ___STEP) {\
 		ssize_t slot_ = (hash_ + i_) % len_;\
-		if (free_slot_ == -1 && !___meta_used_test(ptr_, slot_))\
-		free_slot_ = slot_;\
+		if (free_slot_ == -1 && !___meta_used_test(ptr_, slot_)) free_slot_ = slot_;\
 		if (___meta_used_test(ptr_, slot_) && ___cmpr(ptr_[slot_].key, key_) == 0) {\
+			if (free_slot_ != -1) {\
+				ptr_[free_slot_].key = ptr_[slot_].key;\
+				ptr_[free_slot_].data = ptr_[slot_].data;\
+				___meta_used_clear(ptr_, slot_);\
+				___meta_used_set(ptr_, free_slot_);\
+				slot_ = free_slot_;\
+			}\
 			data_ref_ = &ptr_[slot_].data;\
 			break;\
 		}\
