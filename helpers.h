@@ -118,6 +118,12 @@ static inline unsigned long *___meta_used_ptr(void *len_ptr)
 	return (void *)len_ptr - ___meta_used_sz(len);
 }
 
+/**
+ * @brief **len()** returns the number of items in a dynamic or
+ * an associative array
+ * @param pptr pointer to the dynamic or associative array
+ * @return number of items in the array
+ */
 static inline size_t len(void *ptr)
 {
 	if (!ptr)
@@ -405,6 +411,12 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
+/**
+ * @brief **fprintln()** print a line to a stream
+ * @param fp output stream
+ * @param ... list of values or constants of standard type to print
+ * @return the number of bytes printed
+ */
 #define fprintln(fp, ...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 2];\
 	char *dst_ = fmt_;\
@@ -414,6 +426,11 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	fprintf(fp, fmt_, ##__VA_ARGS__);\
 })
 
+/**
+ * @brief **println()** print a line to the standard output stream
+ * @param ... list of values or constants of standard type to print
+ * @return the number of bytes printed
+ */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
 #define fprintv1(fp, tokens, len, delim) ({\
@@ -477,6 +494,11 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 
 #define printb(bits, nr_bits, ...) fprintb(stdout, bits, nr_bits, ##__VA_ARGS__)
 
+/**
+ * @brief **join()** concatenates an list of values into a single string
+ * @param ... list of values or constants of standard type to join
+ * @return the pointer to the string, should be released by calling `free()`
+ */
 #define join(...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
 	char *dst_ = fmt_;\
@@ -533,6 +555,14 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 #define ___split11(str, delim, p, ...) ___splitn(str, delim, p); ___split10(str, delim, __VA_ARGS__)
 #define ___split12(str, delim, p, ...) ___splitn(str, delim, p); ___split11(str, delim, __VA_ARGS__)
 
+/**
+ * @brief **split()** splits a string into tokens and assigns
+ * the token values to the specified list of variables
+ * @param str the string to be parsed
+ * @param delim substring delimits the tokens in the parsed string
+ * @param ... list of pointers to variables to assign token values to,
+ * tokens will be converted to target type before assignment
+ */
 #define split(str, delim, p, ...) ({\
 	char *__defer(free) __dup = strdup(str);\
 	*(p) = ___strto(*(p), strtok(__dup, delim));\
