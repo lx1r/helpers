@@ -199,6 +199,13 @@ static inline size_t ___align_sz(size_t nb)
 	return nb + 1;
 }
 
+/**
+ * @brief **append()** adds an element to the end of a dynamic array,
+ * expands memory usage if necessary
+ * @param pptr pointer to the dynamic array, may be any type
+ * @param init initializer for a new array element
+ * @return index in the array where the new value is appended
+ */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
 	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + ___meta_len_sz());\
@@ -272,6 +279,14 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 
 #define mapof(key_type, data_type) struct { key_type key; data_type data; }
 
+/**
+ * @brief **insert()** adds an element to a dynamic associative array,
+ * expands memory usage if necessary
+ * @param pptr pointer to the associative array, may be declared using `mapof` macro
+ * @param key associative array index value, maybe any standard type
+ * @param init initializer for a new data element
+ * @return index in the array where the new value is inserted
+ */
 #define insert(pptr, k, ...) ({\
 	ssize_t slot_ = -1;\
 	typeof(*(pptr)) ptr_ = *(pptr);\
@@ -291,6 +306,14 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	slot_;\
 })
 
+/**
+ * @brief **delete()** removes an element from a dynamic associative
+ * array
+ * @param pptr pointer to the associative array
+ * @param data_ref reference to a data associated with a key in the array,
+ * can be returned by `lookup()` method
+ * @return index in the array that `data_ref` belonged to
+ */
 #define delete(pptr, data_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
 	typeof(*(pptr)) slot__ptr = (void *)(data_ref) - ((void *)&ptr_->data - (void *)ptr_);\
@@ -299,6 +322,12 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	slot_;\
 })
 
+/**
+ * @brief **lookup()** search a data associated with a key
+ * @param pptr pointer to the associative array
+ * @param key associative array key value
+ * @return reference to the data that the `key` is associated with
+ */
 #define lookup(pptr, k) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
 	typeof(ptr_->key) key_ = k;\
