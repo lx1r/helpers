@@ -285,7 +285,8 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * @param pptr pointer to the associative array, may be declared using `mapof` macro
  * @param key associative array index value, maybe any standard type
  * @param init initializer for a new data element
- * @return index in the array where the new value is inserted
+ * @return index in the array where the new value is inserted,
+ * the index is valid until any method of the associative array is called
  */
 #define insert(pptr, k, ...) ({\
 	ssize_t slot_ = -1;\
@@ -307,12 +308,12 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 })
 
 /**
- * @brief **delete()** removes an element from a dynamic associative
- * array
+ * @brief **delete()** removes an element from an associative array
  * @param pptr pointer to the associative array
  * @param data_ref reference to a data associated with a key in the array,
  * can be returned by `lookup()` method
  * @return index in the array that `data_ref` belonged to
+ * the index is valid until any method of the associative array is called
  */
 #define delete(pptr, data_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
@@ -326,7 +327,9 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * @brief **lookup()** search a data associated with a key
  * @param pptr pointer to the associative array
  * @param key associative array key value
- * @return reference to the data that the `key` is associated with
+ * @return reference to the data that the `key` is associated with,
+ * the reference is valid until any method of the associative
+ * array is called
  */
 #define lookup(pptr, k) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
