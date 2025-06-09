@@ -21,6 +21,8 @@ void find(int key)
 
 int main()
 {
+	find(7);
+
 	insert(&pd, 1, 1);
 	insert(&pd, 8, 8);
 	insert(&pd, 7, 7);

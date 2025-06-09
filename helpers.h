@@ -312,12 +312,13 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	typeof(*(pptr)) slot_ptr = (void *)(data_ref) - ((void *)&ptr->data - (void *)ptr);\
 	ssize_t slot = slot_ptr - ptr;\
 	___meta_used_clear(ptr, slot);\
+	slot;\
 })
 
 #define lookup(pptr, k) ({\
-	typeof((*(pptr))->data) *data_ref  = NULL;\
 	typeof(*(pptr)) ptr = *(pptr);\
 	typeof((*(pptr))->key) ___k = k;\
+	typeof((*(pptr))->data) *data_ref  = NULL;\
 	size_t cap = len(ptr);\
 	unsigned long hash = ___hash(___k);\
 	for (size_t i = 0; i < cap; i += ___STEP) {\
@@ -412,28 +413,28 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 
 static inline void fprintb(FILE *fp, unsigned long *bits, unsigned long nr_bits)
 {
-        char *delim = "";
-        unsigned long start = -1, end, diff;
+	char *delim = "";
+	unsigned long start = -1, end, diff;
 
-        for (unsigned long i = 0; i < nr_bits; i++) {
-                if (test_bit(i, bits)) {
-                        if (start == -1)
-                                start = i;
-                        end = i;
-                } else {
-                        if (start != -1) {
-                                diff = end - start;
-                                if (diff == 0)
-                                        fprintf(fp, "%s%ld", delim, start);
-                                else if (diff == 1)
-                                        fprintf(fp, "%s%ld,%ld", delim, start, end);
-                                else
-                                        fprintf(fp, "%s%ld-%ld", delim, start, end);
-                                delim = ",";
-                        }
-                        start = -1;
-                }
-        }
+	for (unsigned long i = 0; i < nr_bits; i++) {
+		if (test_bit(i, bits)) {
+			if (start == -1)
+				start = i;
+			end = i;
+		} else {
+			if (start != -1) {
+				diff = end - start;
+				if (diff == 0)
+					fprintf(fp, "%s%ld", delim, start);
+				else if (diff == 1)
+					fprintf(fp, "%s%ld,%ld", delim, start, end);
+				else
+					fprintf(fp, "%s%ld-%ld", delim, start, end);
+				delim = ",";
+			}
+			start = -1;
+		}
+	}
 }
 
 #define printb(bits, n) fprintv(stdout, bits, n)
