@@ -265,27 +265,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 	return -1;
 }
 
-#define ___rehash(pptr, old_len, new_len) ({\
-	typeof(*(pptr)) old = *(pptr);\
-	typeof(*(pptr)) new = ___reserve(new_len, sizeof(*(pptr)), true);\
-	for (size_t i = 0; i < old_len; i++) {\
-		if (!used(old, i)) continue;\
-		size_t slot = ___probe(new, new_len, ___hash(old[i].key));\
-		if (slot != -1) {\
-			new[slot].key = old[i].key;\
-			new[slot].data = old[i].data;\
-			___meta_used_set(new, slot);\
-		} else {\
-			free(new);/*assert*/\
-			new = NULL;\
-			break;\
-		}\
-	}\
-	free(old);\
-	*(pptr) = new;\
-})\
-
-#define mapof(ktype, dtype) struct { ktype key; dtype data; }
+#define mapof(key_type, data_type) struct { key_type key; data_type data; }
 
 #define insert(pptr, k, ...) ({\
 	ssize_t slot = -1;\
