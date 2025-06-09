@@ -252,8 +252,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 		 const char *:          strcmp((char *)(unsigned long)a, (char *)(unsigned long)b),\
 		 default:               memcmp(&a, &b, sizeof(a)))
 
-//___step(len) (len+3)/6
-#define ___STEP (5)
+#define ___STEP 4
 
 static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 {
@@ -270,7 +269,7 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 #define insert(pptr, k, ...) ({\
 	ssize_t slot = -1;\
 	typeof((*(pptr))->key) ___k = k;\
-	if (!*(pptr)) reserve(pptr, ___STEP*10);\
+	if (!*(pptr)) reserve(pptr, 32);\
 	while (*(pptr)) {\
 		typeof(*(pptr)) ptr = *(pptr);\
 		size_t cap = len(ptr);\
