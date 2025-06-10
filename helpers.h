@@ -462,40 +462,40 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 #define printv(tokens, len, ...) fprintv(stdout, tokens, len, ##__VA_ARGS__)
 
 static inline void fprintbs(FILE *fp, unsigned long start, unsigned long end,
-                            const char **period_ptr, const char *comma, const char *dash)
+			    const char **period_ptr, const char *comma, const char *dash)
 {
-        if (start == -1)
-                return;
+	if (start == -1)
+		return;
 
-        unsigned long diff = end - start;
+	unsigned long diff = end - start;
 
-        if (diff == 0)
-                fprintf(fp, "%s%ld", *period_ptr, start);
-        else if (diff == 1)
-                fprintf(fp, "%s%ld%s%ld", *period_ptr, start, comma, end);
-        else
-                fprintf(fp, "%s%ld%s%ld", *period_ptr, start, dash, end);
+	if (diff == 0)
+		fprintf(fp, "%s%ld", *period_ptr, start);
+	else if (diff == 1)
+		fprintf(fp, "%s%ld%s%ld", *period_ptr, start, comma, end);
+	else
+		fprintf(fp, "%s%ld%s%ld", *period_ptr, start, dash, end);
 
-        *period_ptr = comma;
+	*period_ptr = comma;
 }
 
 static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits,
-                            const char *comma, const char *dash)
+			    const char *comma, const char *dash)
 {
-        const char *period = "";
-        unsigned long start = -1, end;
+	const char *period = "";
+	unsigned long start = -1, end;
 
-        for (unsigned long i = 0; i < nr_bits; i++) {
-                if (test_bit(i, bits)) {
-                        if (start == -1)
-                                start = i;
-                        end = i;
-                } else {
-                        fprintbs(fp, start, end, &period, comma, dash);
-                        start = -1;
-                }
-        }
-        fprintbs(fp, start, end, &period, comma, dash);
+	for (unsigned long i = 0; i < nr_bits; i++) {
+		if (test_bit(i, bits)) {
+			if (start == -1)
+				start = i;
+			end = i;
+		} else {
+			fprintbs(fp, start, end, &period, comma, dash);
+			start = -1;
+		}
+	}
+	fprintbs(fp, start, end, &period, comma, dash);
 }
 
 #define fprintb1(fp, bits, nr_bits, comma) fprintb2(fp, bits, nr_bits, comma, "-")
@@ -524,32 +524,32 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 #define joinv(tokens, len, ...) //TODO
 
 #define ___strto(x, s) ({\
-        const char *str_ = s;\
-        (str_) ? \
-        _Generic(x,\
-                 _Bool:                 strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
-                 char:                  str_[0],\
-                 signed char:           (signed char)strtol(str_, NULL, 0),\
-                 unsigned char:         (unsigned char)strtoul(str_, NULL, 0),\
-                 signed short:          (signed short)strtol(str_, NULL, 0),\
-                 unsigned short:        (unsigned short)strtoul(str_, NULL, 0),\
-                 signed int:            (signed int)strtol(str_, NULL, 0),\
-                 unsigned int:          (unsigned int)strtoul(str_, NULL, 0),\
-                 signed long:           strtol(str_, NULL, 0),\
-                 unsigned long:         strtoul(str_, NULL, 0),\
-                 signed long long:      strtoll(str_, NULL, 0),\
-                 unsigned long long:    strtoull(str_, NULL, 0),\
-                 float:                 strtof(str_, NULL),\
-                 double:                strtod(str_, NULL),\
-                 long double:           strtold(str_, NULL),\
-                 char *:                strdup(str_)) : 0;\
+	const char *str_ = s;\
+	(str_) ? \
+	_Generic(x,\
+		 _Bool:                 strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
+		 char:                  str_[0],\
+		 signed char:           (signed char)strtol(str_, NULL, 0),\
+		 unsigned char:         (unsigned char)strtoul(str_, NULL, 0),\
+		 signed short:          (signed short)strtol(str_, NULL, 0),\
+		 unsigned short:        (unsigned short)strtoul(str_, NULL, 0),\
+		 signed int:            (signed int)strtol(str_, NULL, 0),\
+		 unsigned int:          (unsigned int)strtoul(str_, NULL, 0),\
+		 signed long:           strtol(str_, NULL, 0),\
+		 unsigned long:         strtoul(str_, NULL, 0),\
+		 signed long long:      strtoll(str_, NULL, 0),\
+		 unsigned long long:    strtoull(str_, NULL, 0),\
+		 float:                 strtof(str_, NULL),\
+		 double:                strtod(str_, NULL),\
+		 long double:           strtold(str_, NULL),\
+		 char *:                strdup(str_)) : 0;\
 })
 
 #define splitv(str, delim, pptr) ({\
-        char *__defer(free) dup_ = strdup(str);\
-        for (char *token_ = strtok(dup_, delim); token_; token_ = strtok(NULL, delim)) {\
-                append(pptr, ___strto(**(pptr), token_));\
-        }\
+	char *__defer(free) dup_ = strdup(str);\
+	for (char *token_ = strtok(dup_, delim); token_; token_ = strtok(NULL, delim)) {\
+		append(pptr, ___strto(**(pptr), token_));\
+	}\
 })
 
 #define ___splitn(str, delim, p) *(p) = ___strto(*(p), strtok(NULL, delim))
@@ -575,9 +575,9 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
  * tokens will be converted to target type before assignment
  */
 #define split(str, delim, p, ...) ({\
-        char *__defer(free) dup_ = strdup(str);\
-        *(p) = ___strto(*(p), strtok(dup_, delim));\
-        ___apply(___split, ___narg(p, __VA_ARGS__))(dup_, delim, ##__VA_ARGS__);\
+	char *__defer(free) dup_ = strdup(str);\
+	*(p) = ___strto(*(p), strtok(dup_, delim));\
+	___apply(___split, ___narg(p, __VA_ARGS__))(dup_, delim, ##__VA_ARGS__);\
 })
 
 static inline int splitb(const char *str, const char *delim, const char **tokens, int n, unsigned long *bits)
