@@ -245,46 +245,91 @@ static inline unsigned long ___hnv1az(const char *key) {
 	return hash;
 }
 
-#define ___hash(key) \
-	_Generic(key,\
-		 char *:                ___hnv1az((char *)(unsigned long)(key)),\
-		 const char *:          ___hnv1az((char *)(unsigned long)(key)),\
-		 default:               ___hnv1a(&(key), sizeof(typeof(key))))
+#define ___PROBE_STEP 4
 
-#define ___cmpr(a, b) \
-	_Generic(a,\
-		 _Bool:                 (a) - (b),\
-		 char:                  (a) - (b),\
-		 signed char:           (a) - (b),\
-		 unsigned char:         (a) - (b),\
-		 signed short:          (a) - (b),\
-		 unsigned short:        (a) - (b),\
-		 signed int:            (a) - (b),\
-		 unsigned int:          (a) - (b),\
-		 signed long:           (a) - (b),\
-		 unsigned long:         (a) - (b),\
-		 signed long long:      (a) - (b),\
-		 unsigned long long:    (a) - (b),\
-		 float:                 (a) - (b),\
-		 double:                (a) - (b),\
-		 long double:           (a) - (b),\
-		 char *:                strcmp((char *)(unsigned long)a, (char *)(unsigned long)b),\
-		 const char *:          strcmp((char *)(unsigned long)a, (char *)(unsigned long)b),\
-		 default:               memcmp(&a, &b, sizeof(a)))
+static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t));
 
-#define ___STEP 4
-
-static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
+static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t))
 {
-	for (size_t i = 0; i < len; i += ___STEP) {
-		ssize_t slot = (hash + i) % len;
-		if (used(ptr, slot) == false)
-			return slot;
-	}
+	void *ptr = *pptr;
+	//printf("insert: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
+	do {
+		size_t cap = len(ptr);
+		//printf("insert: cap=%zd\n", cap);
+		unsigned long hash = hashfn(data, key_sz);
+		//printf("insert: key=%d, hash=%lx\n", *(int*)data, hash);
+
+		for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
+			size_t slot = (hash + i) % cap;
+			if (___meta_used_test(ptr, slot) == false) {
+				memcpy(ptr + slot*data_sz, data, data_sz);
+				___meta_used_set(ptr, slot);
+				*pptr = ptr;
+				//printf("insert: slot=%zu\n", slot);
+				return slot;
+			}
+		}
+		ptr = ___rehash(ptr, data_sz, key_sz, hashfn);
+	} while (ptr);
+
 	return -1;
 }
 
+static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t))
+{
+	size_t cap = len(ptr);
+	printf("rehash: cap=%zd\n", cap ? cap*2 : 32);
+
+	void *ext_ptr = ___extend(NULL, cap ? cap*2 : 32, data_sz, true);
+	if (!ext_ptr)
+		return NULL;
+
+	for (size_t slot = 0; slot < cap; slot++) {
+		if (___meta_used_test(ptr, slot))
+			___insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
+	}
+	free(ptr);
+	return ext_ptr;
+}
+
+static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t key_sz, size_t val_off, unsigned long (*hashfn)(const void *, size_t), int (*cmprfn)(const void *, const void *, size_t))
+{
+	void *ptr = *pptr;
+	//printf("lookup: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
+	size_t cap = len(ptr);
+	unsigned long hash = hashfn(key_ptr, key_sz);
+	//printf("lookup: key=%d, hash=%lx\n", *(int*)key_ptr, hash);
+
+	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
+		size_t slot = (hash + i) % cap;
+		//printf("lookup: slot=%zu\n", slot);
+		if (___meta_used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
+			return ptr + slot*data_sz + val_off;
+		}
+	}
+	return NULL;
+}
+
+#define ___decl_hashfn(key, func_name) \
+	unsigned long func_name(const void *key_ptr, size_t key_sz) {\
+		return _Generic(key,\
+				char *:		___hnv1az(*(char **)key_ptr),\
+				const char *:	___hnv1az(*(char **)key_ptr),\
+				default:	___hnv1a(key_ptr, key_sz));\
+	}
+
+#define ___decl_cmprfn(key, func_name) \
+	int func_name(const void *lhs, const void *rhs, size_t sz) {\
+		return _Generic(key,\
+				char *:		strcmp(*(char **)lhs, *(char **)rhs),\
+				const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
+				default:	memcmp(lhs, rhs, sz));\
+	}
+
+#define ___value_offset(ptr) ((void *)&(ptr)->data - (void *)(ptr))
+
 #define mapof(key_type, data_type) struct { key_type key; data_type data; }
+#define mapof3(key_type, key_len, data_type) struct { key_type key[key_len]; data_type data; }
 
 /**
  * @brief **insert()** adds an element to a dynamic associative array,
@@ -298,22 +343,9 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * the index is valid until any method of the associative array is called
  */
 #define insert(pptr, k, ...) ({\
-	ssize_t slot_ = -1;\
-	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(ptr_->key) key_ = k;\
-	do {\
-		size_t len_ = len(ptr_);\
-		slot_ = ___probe(ptr_, len_, ___hash(key_));\
-		if (slot_ != -1) {\
-			ptr_[slot_].key = key_;\
-			ptr_[slot_].data = (typeof(ptr_->data))__VA_ARGS__;\
-			___meta_used_set(ptr_, slot_);\
-			break;\
-		}\
-		ptr_ = ___extend(ptr_, 2*len_, sizeof(*ptr_), true);\
-	} while (ptr_);\
-	if (ptr_) *(pptr) = ptr_;\
-	slot_;\
+	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->data))__VA_ARGS__};\
+	___decl_hashfn(data_.key, hashfn_);\
+	___insert((void **)pptr, &data_, sizeof(data_), sizeof((*(pptr))->key), hashfn_);\
 })
 
 /**
@@ -326,8 +358,8 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  */
 #define delete(pptr, data_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(*(pptr)) slot__ptr = (void *)(data_ref) - ((void *)&ptr_->data - (void *)ptr_);\
-	ssize_t slot_ = slot__ptr - ptr_;\
+	typeof(*(pptr)) slot_ptr_ = (void *)(data_ref) - ___value_offset(ptr_);\
+	ssize_t slot_ = slot_ptr_ - ptr_;\
 	___meta_used_clear(ptr_, slot_);\
 	slot_;\
 })
@@ -340,28 +372,10 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
  * the reference is valid until any associative array method is called
  */
 #define lookup(pptr, k) ({\
-	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(ptr_->key) key_ = k;\
-	typeof(ptr_->data) *data_ref_  = NULL;\
-	size_t len_ = len(ptr_);\
-	unsigned long hash_ = ___hash(key_);\
-	size_t free_slot_ = -1;\
-	for (size_t i_ = 0; i_ < len_; i_ += ___STEP) {\
-		ssize_t slot_ = (hash_ + i_) % len_;\
-		if (free_slot_ == -1 && !___meta_used_test(ptr_, slot_)) free_slot_ = slot_;\
-		if (___meta_used_test(ptr_, slot_) && ___cmpr(ptr_[slot_].key, key_) == 0) {\
-			if (free_slot_ != -1) {\
-				ptr_[free_slot_].key = ptr_[slot_].key;\
-				ptr_[free_slot_].data = ptr_[slot_].data;\
-				___meta_used_clear(ptr_, slot_);\
-				___meta_used_set(ptr_, free_slot_);\
-				slot_ = free_slot_;\
-			}\
-			data_ref_ = &ptr_[slot_].data;\
-			break;\
-		}\
-	}\
-	data_ref_;\
+	typeof((*(pptr))->key) key_ = k;\
+	___decl_hashfn(key_, hashfn_);\
+	___decl_cmprfn(key_, cmprfn_);\
+	___lookup((void **)pptr, &key_, sizeof(**(pptr)), sizeof((*(pptr))->key), ___value_offset(*(pptr)), hashfn_, cmprfn_);\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
