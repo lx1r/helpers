@@ -461,30 +461,41 @@ static inline ssize_t ___probe(void *ptr, size_t len, unsigned long hash)
 
 #define printv(tokens, len, ...) fprintv(stdout, tokens, len, ##__VA_ARGS__)
 
-static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits, const char *comma, const char *dash)
+static inline void fprintbs(FILE *fp, unsigned long start, unsigned long end,
+                            const char **period_ptr, const char *comma, const char *dash)
 {
-	const char *period = "";
-	unsigned long start = -1, end, diff;
+        if (start == -1)
+                return;
 
-	for (unsigned long i = 0; i < nr_bits; i++) {
-		if (test_bit(i, bits)) {
-			if (start == -1)
-				start = i;
-			end = i;
-		} else {
-			if (start != -1) {
-				diff = end - start;
-				if (diff == 0)
-					fprintf(fp, "%s%ld", period, start);
-				else if (diff == 1)
-					fprintf(fp, "%s%ld%s%ld", period, start, comma, end);
-				else
-					fprintf(fp, "%s%ld%s%ld", comma, start, dash, end);
-				period = comma;
-			}
-			start = -1;
-		}
-	}
+        unsigned long diff = end - start;
+
+        if (diff == 0)
+                fprintf(fp, "%s%ld", *period_ptr, start);
+        else if (diff == 1)
+                fprintf(fp, "%s%ld%s%ld", *period_ptr, start, comma, end);
+        else
+                fprintf(fp, "%s%ld%s%ld", *period_ptr, start, dash, end);
+
+        *period_ptr = comma;
+}
+
+static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits,
+                            const char *comma, const char *dash)
+{
+        const char *period = "";
+        unsigned long start = -1, end;
+
+        for (unsigned long i = 0; i < nr_bits; i++) {
+                if (test_bit(i, bits)) {
+                        if (start == -1)
+                                start = i;
+                        end = i;
+                } else {
+                        fprintbs(fp, start, end, &period, comma, dash);
+                        start = -1;
+                }
+        }
+        fprintbs(fp, start, end, &period, comma, dash);
 }
 
 #define fprintb1(fp, bits, nr_bits, comma) fprintb2(fp, bits, nr_bits, comma, "-")
