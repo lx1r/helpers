@@ -256,7 +256,7 @@ static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, siz
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
-		if (___meta_used_test(ptr, slot) == false) {
+		if (!___meta_used_test(ptr, slot)) {
 			memcpy(ptr + slot*data_sz, data, data_sz);
 			___meta_used_set(ptr, slot);
 			//printf("insert: slot=%zu\n", slot);
@@ -283,7 +283,6 @@ static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz,
 	free(ptr);
 	return ext_ptr;
 }
-
 
 static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t))
@@ -339,8 +338,16 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
+/**
+ * @brief **mapof()** defines associative array type
+ * @param key_type associative array index (key) type, can be any non-pointer
+ * type except a pointer to a string
+ * @param val_type a type of value associated with the key, can be any type
+ *
+ * To pass associative array pointers to functions, the associative array type
+ * must be fully qualified using the `typedef` keyword.
+ */
 #define mapof(key_type, val_type) struct { key_type key; val_type value; }
-#define mapof3(key_type, key_len, val_type) struct { key_type key[key_len]; val_type value; }
 
 /**
  * @brief **insert()** adds an element to a dynamic associative array,
@@ -376,7 +383,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @brief **lookup()** search a data associated with a key
+ * @brief **lookup()** searches a data associated with a key
  * @param pptr pointer to the associative array
  * @param key associative array key value
  * @return reference to the data that the `key` is associated with,
@@ -487,7 +494,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define printv(tokens, len, ...) fprintv(stdout, tokens, len, ##__VA_ARGS__)
 
 static inline void ___fprint_seq(FILE *fp, unsigned long start, unsigned long end,
-			    const char **period_ptr, const char *comma, const char *dash)
+				 const char **period_ptr, const char *comma, const char *dash)
 {
 	if (start == -1)
 		return;
