@@ -247,35 +247,27 @@ static inline unsigned long ___hnv1az(const char *key) {
 
 #define ___PROBE_STEP 4
 
-static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t));
-
-static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t))
+static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
+				    unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
-	//printf("insert: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
-	do {
-		size_t cap = len(ptr);
-		//printf("insert: cap=%zd\n", cap);
-		unsigned long hash = hashfn(data, key_sz);
-		//printf("insert: key=%d, hash=%lx\n", *(int*)data, hash);
+	size_t cap = len(ptr);
+	unsigned long hash = hashfn(data, key_sz);
 
-		for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-			size_t slot = (hash + i) % cap;
-			if (___meta_used_test(ptr, slot) == false) {
-				memcpy(ptr + slot*data_sz, data, data_sz);
-				___meta_used_set(ptr, slot);
-				*pptr = ptr;
-				//printf("insert: slot=%zu\n", slot);
-				return slot;
-			}
+	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
+		size_t slot = (hash + i) % cap;
+		if (___meta_used_test(ptr, slot) == false) {
+			memcpy(ptr + slot*data_sz, data, data_sz);
+			___meta_used_set(ptr, slot);
+			//printf("insert: slot=%zu\n", slot);
+			return slot;
 		}
-		ptr = ___rehash(ptr, data_sz, key_sz, hashfn);
-	} while (ptr);
-
+	}
 	return -1;
 }
 
-static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz, unsigned long (*hashfn)(const void *, size_t))
+static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz,
+			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
 	printf("rehash: cap=%zd\n", cap ? cap*2 : 32);
@@ -286,13 +278,32 @@ static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz, unsigned
 
 	for (size_t slot = 0; slot < cap; slot++) {
 		if (___meta_used_test(ptr, slot))
-			___insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
+			___try_insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
 	}
 	free(ptr);
 	return ext_ptr;
 }
 
-static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t key_sz, size_t val_off, unsigned long (*hashfn)(const void *, size_t), int (*cmprfn)(const void *, const void *, size_t))
+
+static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
+				unsigned long (*hashfn)(const void *, size_t))
+{
+	void *ptr = *pptr;
+	//printf("insert: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
+	do {
+		size_t slot = ___try_insert(pptr, data, data_sz, key_sz, hashfn);
+		if (slot != -1)
+			return slot;
+		ptr = ___rehash(ptr, data_sz, key_sz, hashfn);
+		if (ptr) *pptr = ptr;
+	} while (ptr);
+
+	return -1;
+}
+
+static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t key_sz, size_t val_off,
+			      unsigned long (*hashfn)(const void *, size_t),
+			      int (*cmprfn)(const void *, const void *, size_t))
 {
 	void *ptr = *pptr;
 	//printf("lookup: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
@@ -326,10 +337,10 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 				default:	memcmp(lhs, rhs, sz));\
 	}
 
-#define ___value_offset(ptr) ((void *)&(ptr)->data - (void *)(ptr))
+#define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
-#define mapof(key_type, data_type) struct { key_type key; data_type data; }
-#define mapof3(key_type, key_len, data_type) struct { key_type key[key_len]; data_type data; }
+#define mapof(key_type, val_type) struct { key_type key; val_type value; }
+#define mapof3(key_type, key_len, val_type) struct { key_type key[key_len]; val_type value; }
 
 /**
  * @brief **insert()** adds an element to a dynamic associative array,
@@ -343,7 +354,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * the index is valid until any method of the associative array is called
  */
 #define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->data))__VA_ARGS__};\
+	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	___decl_hashfn(data_.key, hashfn_);\
 	___insert((void **)pptr, &data_, sizeof(data_), sizeof((*(pptr))->key), hashfn_);\
 })
@@ -351,14 +362,14 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 /**
  * @brief **delete()** removes an element from an associative array
  * @param pptr pointer to the associative array
- * @param data_ref reference to a data associated with a key in the array,
- * can be returned by `lookup()` method
- * @return index in the array that `data_ref` belonged to
+ * @param val_ref reference to a data value associated with a key
+ * in the array, can be returned by `lookup()` method
+ * @return index in the array that `val_ref` belonged to,
  * the index is valid until any associative array method is called
  */
-#define delete(pptr, data_ref) ({\
+#define delete(pptr, val_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(*(pptr)) slot_ptr_ = (void *)(data_ref) - ___value_offset(ptr_);\
+	typeof(*(pptr)) slot_ptr_ = (void *)(val_ref) - ___value_offset(ptr_);\
 	ssize_t slot_ = slot_ptr_ - ptr_;\
 	___meta_used_clear(ptr_, slot_);\
 	slot_;\
@@ -475,7 +486,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 #define printv(tokens, len, ...) fprintv(stdout, tokens, len, ##__VA_ARGS__)
 
-static inline void fprintbs(FILE *fp, unsigned long start, unsigned long end,
+static inline void ___fprint_seq(FILE *fp, unsigned long start, unsigned long end,
 			    const char **period_ptr, const char *comma, const char *dash)
 {
 	if (start == -1)
@@ -505,11 +516,11 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 				start = i;
 			end = i;
 		} else {
-			fprintbs(fp, start, end, &period, comma, dash);
+			___fprint_seq(fp, start, end, &period, comma, dash);
 			start = -1;
 		}
 	}
-	fprintbs(fp, start, end, &period, comma, dash);
+	___fprint_seq(fp, start, end, &period, comma, dash);
 }
 
 #define fprintb1(fp, bits, nr_bits, comma) fprintb2(fp, bits, nr_bits, comma, "-")

@@ -7,7 +7,7 @@ void walk()
 	println("len=", len(pd));
 	for (int i = 0; i < len(pd); i++)
 		if (used(pd, i))
-			println("slot=", i, " key=", pd[i].key, " data=", pd[i].data);
+			println("slot=", i, " key=", pd[i].key, " data=", pd[i].value);
 }
 
 void find(int key)
