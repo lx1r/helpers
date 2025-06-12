@@ -266,19 +266,25 @@ static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, siz
 	return -1;
 }
 
-static inline void *___rehash(void *ptr, size_t data_sz, size_t key_sz,
+static inline void *___rehash(void *ptr, size_t ext_cap, size_t data_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
-	printf("rehash: cap=%zd\n", cap ? cap*2 : 32);
+	if (!ext_cap) ext_cap = 32;
+	printf("rehash: cap=%zd\n", ext_cap);
 
-	void *ext_ptr = ___extend(NULL, cap ? cap*2 : 32, data_sz, true);
+	void *ext_ptr = ___extend(NULL, ext_cap, data_sz, true);
 	if (!ext_ptr)
 		return NULL;
 
 	for (size_t slot = 0; slot < cap; slot++) {
-		if (___meta_used_test(ptr, slot))
-			___try_insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
+		if (___meta_used_test(ptr, slot)) {
+			ssize_t rc = ___try_insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
+			if (rc == -1) {
+				free(ext_ptr);
+				return NULL;
+			}
+		}
 	}
 	free(ptr);
 	return ext_ptr;
@@ -293,7 +299,7 @@ static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t 
 		size_t slot = ___try_insert(pptr, data, data_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
-		ptr = ___rehash(ptr, data_sz, key_sz, hashfn);
+		ptr = ___rehash(ptr, 2*len(ptr), data_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -393,7 +399,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	typeof((*(pptr))->key) key_ = k;\
 	___decl_hashfn(key_, hashfn_);\
 	___decl_cmprfn(key_, cmprfn_);\
-	___lookup((void **)pptr, &key_, sizeof(**(pptr)), sizeof((*(pptr))->key), ___value_offset(*(pptr)), hashfn_, cmprfn_);\
+	___lookup((void **)pptr, &key_, sizeof(**(pptr)), sizeof((*(pptr))->key), \
+		  ___value_offset(*(pptr)), hashfn_, cmprfn_);\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
