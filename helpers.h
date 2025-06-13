@@ -551,7 +551,7 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 /**
  * @brief **join()** concatenates an list of values into a single string
  * @param ... list of values or constants of standard type to join
- * @return the pointer to the string, should be released by calling `free()`
+ * @return the pointer to joined string, should be released by calling `free()`
  */
 #define join(...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
@@ -565,14 +565,11 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 })
 
 /**
- * @brief **joinv()** concatenates an an array into a single string
+ * @brief **joinv()** concatenates an array into a single string
  * @param tokens array of values or constants of standard type to join
- * @param nr_tokens number of tokens to join (default is len(tokens))
- * @param delim substring between the joined tokens (default ",")
- * @return the number of bytes printed
- *
- * @param ... list of values or constants of standard type to join
- * @return the pointer to the string, should be released by calling `free()`
+ * @param nr_tokens number of elements to join (default is len(tokens))
+ * @param delim substring between the joined elements (default ",")
+ * @return the pointer to joined string, should be released by calling `free()`
  */
 
 #define joinv(tokens, nr_tokens, delim) //TODO
