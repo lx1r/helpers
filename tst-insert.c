@@ -37,6 +37,9 @@ void del(int key)
 	find(key);
 }
 
+#define foreach1(ref, ptr, len) \
+	for (typeof(ptr) (ref) = (ptr); (ref) < (ptr) + len; (ref)++) \
+
 #define foreach(ref, ptr) \
 	for (typeof(ptr) (ref) = (ptr); (ref) < (ptr) + len(ptr); (ref)++) \
 	if (used(ptr, (ref) - (ptr)))

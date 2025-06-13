@@ -184,9 +184,18 @@ static inline bool used(void *ptr, ssize_t slot)
 		test_bit(slot, ___meta_used_ptr(len_ptr));
 }
 
-#define reserve2(pptr, len, has_used) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), has_used)
+#define reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
 #define reserve1(pptr, len) reserve2(pptr, len, false)
 #define reserve0(pptr) reserve1(pptr, 32)
+
+/**
+ * @brief **reserve()** pre-allocates memory for an array
+ * @param pptr pointer to the dynamic or associative dynamic array,
+ * may be any type
+ * @param len pre-allocated items count (default: 32)
+ * @map if true preallocate memory for an associative array
+ * @return pointer to the pre-allocated array
+ */
 #define reserve(pptr, ...)\
 	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
@@ -196,10 +205,10 @@ static inline size_t ___align_sz(size_t nb)
 	/* initial size */
 	if (!(nb & ~0xf))
 		return 64;
-	/* align to page */
+	/* align to page if large enought */
 	if (nb & ~0xfff)
 		return (nb + 0xfff) & ~0xfff;
-	/* align to power of 2 */
+	/* otherwise align to power of 2 */
 	nb = nb - 1;
 	nb |= (nb >> 1);
 	nb |= (nb >> 2);
@@ -217,7 +226,7 @@ static inline size_t ___align_sz(size_t nb)
  */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
-	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + ___meta_len_sz());\
+	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + ___meta_len_sz() + 16) - 16;\
 	typeof(*(pptr)) ptr_ = realloc(*(pptr), sz_);\
 	if (ptr_) {\
 		ptr_[len_ - 1] = (typeof(*ptr_))__VA_ARGS__;\
@@ -341,9 +350,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @brief **mapof()** defines associative array type
+ * @brief **mapof()** associative array item declaration
  * @param key_type associative array index (key) type, can be any non-pointer
- * type except a pointer to a string
+ * type except a pointer to a null terminated string
  * @param val_type a type of value associated with the key, can be any type
  *
  * To pass associative array pointers to functions, the associative array type
@@ -642,7 +651,7 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
  * @param ... list of pointers to variables to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
- * For pointers to the string, the necessary amount of memory will be
+ * For pointers to a string, the necessary amount of memory will be
  * allocated to store the token. Such memory should be released by
  * calling `free()`.
  */
@@ -655,7 +664,7 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 /**
  * @brief **splitv()** splits a string into tokens and assigns
  * the token values to a list
- * @param str the string to be parsed
+ * @param str string to be parsed
  * @param delima substring separates tokens in the parsed string
  * @param pptr pointer to a list to assign token values to
  *
