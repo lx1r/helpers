@@ -94,14 +94,14 @@ static inline size_t *___meta_len_ptr(void *ptr)
 	return ptr + ___cap(ptr) - ___meta_len_sz();
 }
 
-static inline size_t ___meta_len(size_t *len_ptr)
-{
-	return *len_ptr & ~___HAS_USED_MASK;
-}
-
 static inline bool ___meta_has_used(size_t *len_ptr)
 {
 	return !!(*len_ptr & ___HAS_USED_MASK);
+}
+
+static inline size_t ___meta_get_len(size_t *len_ptr)
+{
+	return *len_ptr & ~___HAS_USED_MASK;
 }
 
 static inline void ___meta_set_len(size_t *len_ptr, size_t len, bool has_used)
@@ -114,7 +114,7 @@ static inline unsigned long *___meta_used_ptr(void *len_ptr)
 {
 	if (!___meta_has_used(len_ptr))
 		return NULL;
-	size_t len = ___meta_len(len_ptr);
+	size_t len = ___meta_get_len(len_ptr);
 	return (void *)len_ptr - ___meta_used_sz(len);
 }
 
@@ -129,33 +129,38 @@ static inline size_t len(void *ptr)
 	if (!ptr)
 		return 0;
 	size_t *len_ptr = ___meta_len_ptr(ptr);
-	return ___meta_len(len_ptr);
+	return ___meta_get_len(len_ptr);
 }
 
 static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 {
 	unsigned long *prev_used_ptr = NULL;
 	size_t prev_used_sz = 0;
+	size_t prev_len = 0;
+
+	if (!len)
+		return ptr;
 
 	if (ptr) {
 		size_t *len_ptr = ___meta_len_ptr(ptr);
 		prev_used_ptr = ___meta_used_ptr(len_ptr);
-		prev_used_sz = ___meta_used_sz(___meta_len(len_ptr));
+		prev_len = ___meta_get_len(len_ptr);
+		prev_used_sz = ___meta_used_sz(prev_len);
+		if (prev_used_sz)
+			has_used = true;
 	}
-	if (!ptr && !len)
-		len = 32;
 
 	ptr = realloc(ptr, sz*len + ___meta_used_sz(len) + ___meta_len_sz());
 	if (!ptr)
 		return NULL;
 
 	size_t *len_ptr = ___meta_len_ptr(ptr);
-	___meta_set_len(len_ptr, len, has_used || prev_used_ptr);
+	___meta_set_len(len_ptr, has_used ? len : prev_len, has_used);
 	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
 
 	if (prev_used_ptr)
 		memmove(used_ptr, prev_used_ptr, prev_used_sz);
-	if (has_used || prev_used_ptr)
+	if (has_used)
 		memset(used_ptr + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
 
 	return ptr;
@@ -495,7 +500,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 #define fprintv2(fp, tokens, nr_tokens, delim) ___printv(fp, tokens, nr_tokens, delim)
-#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, ",")
+#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, " ")
 #define fprintv0(fp, tokens) fprintv1(fp, tokens, len(tokens))
 #define fprintv(fp, tokens, ...)\
 	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, ##__VA_ARGS__)
@@ -504,7 +509,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * @brief **printv()** print an array to the standard output stream
  * @param tokens array of values or constants of standard type to print
  * @param nr_tokens number of tokens to output (default is len())
- * @param delim delimiter output between the tokens (default ",")
+ * @param delim delimiter output between the tokens (default is a space)
  * @return the number of bytes printed
  */
 #define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
@@ -594,14 +599,14 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 })
 
 #define joinv2(tokens, nr_tokens, delim) ___joinv(tokens, nr_tokens, delim)
-#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, ",")
+#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, " ")
 #define joinv0(tokens) joinv1(tokens, len(tokens))
 
 /**
  * @brief **joinv()** concatenates an array into a single string
  * @param tokens array of values or constants of standard type to join
  * @param nr_tokens number of elements to join (default is len(tokens))
- * @param delim substring between the joined elements (default ",")
+ * @param delim substring between the joined elements (default is a space)
  * @return the pointer to joined string, should be released by calling `free()`
  */
 #define joinv(tokens, ...)\

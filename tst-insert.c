@@ -3,10 +3,17 @@
 mapof(int, int) *ptr = NULL, *prev;
 int *keys = NULL;
 
+static inline unsigned xrand()
+{
+	static unsigned seed = 31421;
+	seed = 16807*(seed%127773) - 2836*(seed/127773);
+	return seed;
+}
+
 void add()
 {
-	int key = rand() & 0xffff;
-	int data = rand() & 0xfff;
+	int key = xrand() & 0xffff;
+	int data = xrand() & 0xfff;
 	void *prev = ptr;
 
 	println("insert: key=", key, " data=", data);
