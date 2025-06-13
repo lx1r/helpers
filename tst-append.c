@@ -23,7 +23,7 @@ int main()
 	println("ret=", ret);
 
 	print("len=", len(nums), ": ");
-	printv(nums, len(nums));
+	printv(nums);
 	println();
 
 	printb(nums, len(nums)*BITS_PER_LONG);

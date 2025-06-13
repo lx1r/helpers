@@ -472,33 +472,37 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
-#define fprintv1(fp, tokens, len, delim) ({\
-	size_t len_ = (len);\
-	if (len_ > 0) {\
-		char fmt_[4 + 2 + 1];\
-		char *dst_ = fmt_;\
-		typeof(tokens) *tokens_ = &(tokens);\
-		___fill_pr_fmt(dst_, (*tokens_)[0]);\
-		*dst_ = '\0';\
-		fprintf(fp, fmt_, (*tokens_)[0]);\
-		if (len_ > 1) {\
-			dst_ = fmt_;\
-			*dst_++ = '%';\
-			*dst_++ = 's';\
-			___fill_pr_fmt(dst_, (*tokens_)[0]);\
-			*dst_ = '\0';\
-			for (size_t i_ = 1; i_ < len_; i_++) {\
-				fprintf(fp, fmt_, delim, (*tokens_)[i_]);\
-			}\
-		}\
+#define ___printv(fp, tokens, nr_tokens, delim) ({\
+	int nb = 0;\
+	size_t len_ = (nr_tokens);\
+	const char *delim_ = "";\
+	char fmt_[4 + 2 + 1];\
+	char *dst_ = fmt_;\
+	typeof(tokens) *tokens_ptr_ = &(tokens);\
+	___fill_pr_fmt(dst_, delim_);\
+	___fill_pr_fmt(dst_, **tokens_ptr_);\
+	*dst_ = '\0';\
+	for (size_t i_ = 0; i_ < len_; i_++) {\
+		nb += fprintf(fp, fmt_, delim_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) delim_ = (delim);\
 	}\
+	nb;\
 })
 
-#define fprintv0(fp, tokens, len) fprintv1(fp, tokens, len, ",")
-#define fprintv(fp, tokens, len, ...)\
-	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, len, ##__VA_ARGS__)
+#define fprintv2(fp, tokens, nr_tokens, delim) ___printv(fp, tokens, nr_tokens, delim)
+#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, ",")
+#define fprintv0(fp, tokens) fprintv1(fp, tokens, len(tokens))
+#define fprintv(fp, tokens, ...)\
+	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, ##__VA_ARGS__)
 
-#define printv(tokens, len, ...) fprintv(stdout, tokens, len, ##__VA_ARGS__)
+/**
+ * @brief **printv()** print an array to the standard output stream
+ * @param tokens array of values or constants of standard type to print
+ * @param nr_tokens number of tokens to output (default is len())
+ * @param delim delimiter output between the tokens (default ",")
+ * @return the number of bytes printed
+ */
+#define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
 
 static inline void ___fprint_seq(FILE *fp, unsigned long start, unsigned long end,
 				 const char **period_ptr, const char *comma, const char *dash)
@@ -560,7 +564,18 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 	buf;\
 })
 
-#define joinv(tokens, len, ...) //TODO
+/**
+ * @brief **joinv()** concatenates an an array into a single string
+ * @param tokens array of values or constants of standard type to join
+ * @param nr_tokens number of tokens to join (default is len(tokens))
+ * @param delim substring between the joined tokens (default ",")
+ * @return the number of bytes printed
+ *
+ * @param ... list of values or constants of standard type to join
+ * @return the pointer to the string, should be released by calling `free()`
+ */
+
+#define joinv(tokens, nr_tokens, delim) //TODO
 
 #define ___strto(x, s) ({\
 	const char *str_ = s;\
@@ -582,13 +597,6 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 		 double:                strtod(str_, NULL),\
 		 long double:           strtold(str_, NULL),\
 		 char *:                strdup(str_)) : 0;\
-})
-
-#define splitv(str, delim, pptr) ({\
-	char *__defer(free) dup_ = strdup(str);\
-	for (char *token_ = strtok(dup_, delim); token_; token_ = strtok(NULL, delim)) {\
-		append(pptr, ___strto(**(pptr), token_));\
-	}\
 })
 
 #define ___splitn(str, delim, p) *(p) = ___strto(*(p), strtok(NULL, delim))
@@ -619,14 +627,28 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 	___apply(___split, ___narg(p, __VA_ARGS__))(dup_, delim, ##__VA_ARGS__);\
 })
 
-static inline int splitb(const char *str, const char *delim, const char **tokens, int n, unsigned long *bits)
+/**
+ * @brief **splitv()** splits a string into tokens and assigns the token values to a list
+ * @param str the string to be parsed
+ * @param delim substring delimits the tokens in the parsed string
+ * @param pptr pointer to a list to assign token values to
+ * tokens will be converted to target type before assignment
+ */
+#define splitv(str, delim, pptr) ({\
+	char *__defer(free) dup_ = strdup(str);\
+	for (char *token_ = strtok(dup_, delim); token_; token_ = strtok(NULL, delim)) {\
+		append(pptr, ___strto(**(pptr), token_));\
+	}\
+})
+
+static inline int splitb(const char *str, const char *delim, const char **tokens, int nr_tokens, unsigned long *bits)
 {
 	char __defer(free) *dup = strdup(str);
 	if (!dup)
 		return -1;
 
 	for (char *token = strtok(dup, delim); token; token = strtok(NULL, delim)) {
-		for (int i = 0; i < n; i++)
+		for (int i = 0; i < nr_tokens; i++)
 			if (strcmp(token, tokens[i]) == 0)
 				set_bit(i, bits);
 	}
