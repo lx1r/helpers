@@ -184,9 +184,11 @@ static inline bool used(void *ptr, ssize_t slot)
 		test_bit(slot, ___meta_used_ptr(len_ptr));
 }
 
-#define reserve(pptr, len) ({\
-	*(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), true);\
-})
+#define reserve2(pptr, len, has_used) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), has_used)
+#define reserve1(pptr, len) reserve2(pptr, len, false)
+#define reserve0(pptr) reserve1(pptr, 32)
+#define reserve(pptr, ...)\
+	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
 static inline size_t ___align_sz(size_t nb)
 {
@@ -259,7 +261,6 @@ static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, siz
 		if (!___meta_used_test(ptr, slot)) {
 			memcpy(ptr + slot*data_sz, data, data_sz);
 			___meta_used_set(ptr, slot);
-			//printf("insert: slot=%zu\n", slot);
 			return slot;
 		}
 	}
@@ -271,7 +272,6 @@ static inline void *___rehash(void *ptr, size_t ext_cap, size_t data_sz, size_t 
 {
 	size_t cap = len(ptr);
 	if (!ext_cap) ext_cap = 32;
-	printf("rehash: cap=%zd\n", ext_cap);
 
 	void *ext_ptr = ___extend(NULL, ext_cap, data_sz, true);
 	if (!ext_ptr)
@@ -294,7 +294,6 @@ static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t 
 				unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
-	//printf("insert: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
 	do {
 		size_t slot = ___try_insert(pptr, data, data_sz, key_sz, hashfn);
 		if (slot != -1)
@@ -311,14 +310,11 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 			      int (*cmprfn)(const void *, const void *, size_t))
 {
 	void *ptr = *pptr;
-	//printf("lookup: data_sz=%zu key_sz=%zu\n", data_sz, key_sz);
 	size_t cap = len(ptr);
 	unsigned long hash = hashfn(key_ptr, key_sz);
-	//printf("lookup: key=%d, hash=%lx\n", *(int*)key_ptr, hash);
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
-		//printf("lookup: slot=%zu\n", slot);
 		if (___meta_used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
 			return ptr + slot*data_sz + val_off;
 		}
@@ -473,7 +469,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
 #define ___printv(fp, tokens, nr_tokens, delim) ({\
-	int nb = 0;\
+	int nb_ = 0;\
 	size_t len_ = (nr_tokens);\
 	const char *delim_ = "";\
 	char fmt_[4 + 2 + 1];\
@@ -483,10 +479,10 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	___fill_pr_fmt(dst_, **tokens_ptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb += fprintf(fp, fmt_, delim_, (*tokens_ptr_)[i_]);\
+		nb_ += fprintf(fp, fmt_, delim_, (*tokens_ptr_)[i_]);\
 		if (i_ == 0) delim_ = (delim);\
 	}\
-	nb;\
+	nb_;\
 })
 
 #define fprintv2(fp, tokens, nr_tokens, delim) ___printv(fp, tokens, nr_tokens, delim)
@@ -504,8 +500,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
 
-static inline void ___fprint_seq(FILE *fp, unsigned long start, unsigned long end,
-				 const char **period_ptr, const char *comma, const char *dash)
+static inline void ___fprint_bit_seq(FILE *fp, unsigned long start, unsigned long end,
+				     const char **period_ptr, const char *comma, const char *dash)
 {
 	if (start == -1)
 		return;
@@ -522,8 +518,8 @@ static inline void ___fprint_seq(FILE *fp, unsigned long start, unsigned long en
 	*period_ptr = comma;
 }
 
-static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits,
-			    const char *comma, const char *dash)
+static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long nr_bits,
+				  const char *comma, const char *dash)
 {
 	const char *period = "";
 	unsigned long start = -1, end;
@@ -534,14 +530,14 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 				start = i;
 			end = i;
 		} else {
-			___fprint_seq(fp, start, end, &period, comma, dash);
+			___fprint_bit_seq(fp, start, end, &period, comma, dash);
 			start = -1;
 		}
 	}
-	___fprint_seq(fp, start, end, &period, comma, dash);
+	___fprint_bit_seq(fp, start, end, &period, comma, dash);
 }
 
-#define fprintb1(fp, bits, nr_bits, comma) fprintb2(fp, bits, nr_bits, comma, "-")
+#define fprintb1(fp, bits, nr_bits, comma) ___fprint_bits(fp, bits, nr_bits, comma, "-")
 #define fprintb0(fp, bits, nr_bits) fprintb1(fp, bits, nr_bits, ",")
 #define fprintb(fp, bits, nr_bits, ...)\
 	___apply(fprintb, ___narg(__VA_ARGS__))(fp, bits, nr_bits, ##__VA_ARGS__)
@@ -558,11 +554,39 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 	char *dst_ = fmt_;\
 	___fill_fmt(dst_, __VA_ARGS__);\
 	*dst_++ = '\0';\
-	size_t nb = snprintf(NULL, 0, fmt_, __VA_ARGS__);\
-	char *buf = malloc(nb + 1);\
-	if (buf) sprintf(buf, fmt_, __VA_ARGS__);\
-	buf;\
+	int nb_ = snprintf(NULL, 0, fmt_, __VA_ARGS__);\
+	char *buf_ = malloc(nb_ + 1);\
+	if (buf_) sprintf(buf_, fmt_, __VA_ARGS__);\
+	buf_;\
 })
+
+#define ___joinv(tokens, nr_tokens, delim) ({\
+	int nb_ = 0;\
+	size_t len_ = (nr_tokens);\
+	const char *delim_ = "";\
+	char fmt_[4 + 2 + 1];\
+	char *dst_ = fmt_;\
+	typeof(tokens) *tokens_ptr_ = &(tokens);\
+	___fill_pr_fmt(dst_, delim_);\
+	___fill_pr_fmt(dst_, **tokens_ptr_);\
+	*dst_ = '\0';\
+	for (size_t i_ = 0; i_ < len_; i_++) {\
+		nb_ += snprintf(NULL, 0, fmt_, delim_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) delim_ = (delim);\
+	}\
+	char *buf_ = malloc(nb_ + 1);\
+	nb_ = 0;\
+	delim_ = "";\
+	for (size_t i_ = 0; i_ < len_; i_++) {\
+		nb_ += sprintf(buf_ + nb_, fmt_, delim_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) delim_ = (delim);\
+	}\
+	buf_;\
+})
+
+#define joinv2(tokens, nr_tokens, delim) ___joinv(tokens, nr_tokens, delim)
+#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, ",")
+#define joinv0(tokens) joinv1(tokens, len(tokens))
 
 /**
  * @brief **joinv()** concatenates an array into a single string
@@ -571,8 +595,8 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
  * @param delim substring between the joined elements (default ",")
  * @return the pointer to joined string, should be released by calling `free()`
  */
-
-#define joinv(tokens, nr_tokens, delim) //TODO
+#define joinv(tokens, ...)\
+	___apply(joinv, ___narg(__VA_ARGS__))(tokens, ##__VA_ARGS__)
 
 #define ___strto(x, s) ({\
 	const char *str_ = s;\
@@ -615,8 +639,12 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
  * the token values to the specified list of variables
  * @param str the string to be parsed
  * @param delim substring delimits the tokens in the parsed string
- * @param ... list of pointers to variables to assign token values to,
- * tokens will be converted to target type before assignment
+ * @param ... list of pointers to variables to assign token values to
+ *
+ * Tokens will be converted to the target type before assignment.
+ * For pointers to the string, the necessary amount of memory will be
+ * allocated to store the token. Such memory should be released by
+ * calling `free()`.
  */
 #define split(str, delim, p, ...) ({\
 	char *__defer(free) dup_ = strdup(str);\
@@ -625,11 +653,13 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 })
 
 /**
- * @brief **splitv()** splits a string into tokens and assigns the token values to a list
+ * @brief **splitv()** splits a string into tokens and assigns
+ * the token values to a list
  * @param str the string to be parsed
- * @param delim substring delimits the tokens in the parsed string
+ * @param delima substring separates tokens in the parsed string
  * @param pptr pointer to a list to assign token values to
- * tokens will be converted to target type before assignment
+ *
+ * Tokens will be converted to the target type before assignment.
  */
 #define splitv(str, delim, pptr) ({\
 	char *__defer(free) dup_ = strdup(str);\
@@ -638,7 +668,8 @@ static inline void fprintb2(FILE *fp, unsigned long *bits, unsigned long nr_bits
 	}\
 })
 
-static inline int splitb(const char *str, const char *delim, const char **tokens, int nr_tokens, unsigned long *bits)
+static inline int splitb(const char *str, const char *delim, const char **tokens,
+			 int nr_tokens, unsigned long *bits)
 {
 	char __defer(free) *dup = strdup(str);
 	if (!dup)

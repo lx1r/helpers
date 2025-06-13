@@ -1,106 +1,81 @@
 #include "helpers.h"
 
-mapof(int, int) *pd = NULL;
+mapof(int, int) *ptr = NULL, *prev;
+int *keys = NULL;
 
-void walk()
+void add()
 {
-	println("len=", len(pd));
-	for (int i = 0; i < len(pd); i++)
-		if (used(pd, i))
-			println("slot=", i, " key=", pd[i].key, " data=", pd[i].value);
+	int key = rand() & 0xffff;
+	int data = rand() & 0xfff;
+	void *prev = ptr;
+
+	println("insert: key=", key, " data=", data);
+	insert(&ptr, key, data) ;
+	if (prev != ptr)
+		println("rehash: ", len(ptr));
+
+	append(&keys, key);
 }
 
 void find(int key)
 {
-	int *data = lookup(&pd, key);
+	int *data = lookup(&ptr, key);
 	if (data)
-		println("found key=", key, " data=", *data);
+		println("lookup: key=", key, " data=", *data);
 	else
-		println("key=", key, " not found");
+		println("lookup: key=", key, " not found");
+}
+
+void del(int key)
+{
+	int *data = lookup(&ptr, key);
+	if (!data) {
+		println("delete: key=", key, " not found");
+		return;
+	}
+	delete(&ptr, data);
+	find(key);
+}
+
+#define foreach(ref, ptr) \
+	for (typeof(ptr) (ref) = (ptr); (ref) < (ptr) + len(ptr); (ref)++) \
+	if (used(ptr, (ref) - (ptr)))
+
+void walk()
+{
+	println("len=", len(ptr));
+	foreach(ref, ptr)
+		println("slot=", ref - ptr, " key=", ref->key, " data=", ref->value);
 }
 
 int main()
 {
+	println("ALIGN(1)=", ALIGN(1, sizeof(unsigned long)));
+	println("ALIGN_DOWN(1)=", ALIGN_DOWN(1, sizeof(unsigned long)));
+	println("ALIGN_DOWN(", sizeof(unsigned long), ")=", ALIGN_DOWN(sizeof(unsigned long), sizeof(unsigned long)));
+	println("ALIGN_DOWN(40)=", ALIGN_DOWN(40, sizeof(unsigned long)));
+
 	find(7);
 
-	insert(&pd, 1, 1);
-	insert(&pd, 8, 8);
-	insert(&pd, 7, 7);
-	insert(&pd, 4, 4);
-	insert(&pd, 9, 9);
-	insert(&pd, 19, 19);
-
-	walk();
-	find(7);
-
-	insert(&pd, 12, 12);
-	insert(&pd, 83, 83);
-	insert(&pd, 74, 74);
-	insert(&pd, 34, 34);
-	insert(&pd, 29, 29);
-	insert(&pd, 219, 219);
-	insert(&pd, 432, 432);
-	insert(&pd, 56, 56);
-	insert(&pd, 233, 233);
-	insert(&pd, 76, 76);
-	insert(&pd, 32, 32);
-	insert(&pd, 412, 412);
-	insert(&pd, 453, 453);
-	insert(&pd, 432, 432);
-	insert(&pd, 342, 342);
-	insert(&pd, 324, 324);
-
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
-	insert(&pd, 23, 99);
+	insert(&ptr, 1, 11);
+	insert(&ptr, 8, 18);
+	insert(&ptr, 7, 17);
+	insert(&ptr, 4, 14);
+	insert(&ptr, 9, 19);
+	insert(&ptr, 11, 111);
 	walk();
 
-	find(1);
-	find(8);
-	find(7);
-	find(4);
-	find(9);
-	find(19);
+	reserve(&keys, 64);
+	reserve(&ptr, 64, true);
 
-	find(12);
-        find(83);
-        find(74);
-        find(34);
-        find(29);
-        find(219);
-        find(432);
-        find(56);
-        find(233);
-        find(76);
-        find(32);
-        find(412);
-        find(453);
-        find(432);
-        find(342);
-        find(324);
-        find(11111);
+	insert(&ptr, 7, 17);
 
-	int *data = lookup(&pd, 7);
-	delete(&pd, data);
-	find(7);
+	for (int i = 0; i < 1000; i++) add();
+	walk();
+
+	foreach(it, keys) find(*it);
+
+	del(7);
 
 	return 0;
 }
