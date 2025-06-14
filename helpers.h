@@ -119,10 +119,10 @@ static inline unsigned long *___meta_used_ptr(void *len_ptr)
 }
 
 /**
- * @brief **len()** returns the number of items in a dynamic or
- * an associative array
+ * @brief **len()** returns the number of elements in a dynamic
+ * or an associative array
  * @param pptr pointer to the dynamic or associative array
- * @return number of items in the array
+ * @return number of elements in the array
  */
 static inline size_t len(void *ptr)
 {
@@ -195,7 +195,7 @@ static inline bool used(void *ptr, ssize_t slot)
 
 /**
  * @brief **reserve()** pre-allocates memory for an array
- * @param pptr pointer to the dynamic or associative dynamic array,
+ * @param pptr pointer to the dynamic or associative array,
  * may be any type
  * @param len pre-allocated items count (default: 32)
  * @map if true preallocate memory for an associative array
