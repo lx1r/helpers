@@ -261,7 +261,9 @@ static inline unsigned long ___hnv1az(const char *key) {
 	return hash;
 }
 
-#define ___PROBE_STEP 4
+#ifndef ___PROBE_STEP
+#define ___PROBE_STEP 5
+#endif
 
 static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
@@ -319,6 +321,8 @@ static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t 
 	return -1;
 }
 
+static size_t ___lookup_probes = 0;
+
 static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t key_sz, size_t val_off,
 			      unsigned long (*hashfn)(const void *, size_t),
 			      int (*cmprfn)(const void *, const void *, size_t))
@@ -329,6 +333,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
+		___lookup_probes++;
 		if (___meta_used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
 			return ptr + slot*data_sz + val_off;
 		}

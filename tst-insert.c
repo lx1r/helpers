@@ -83,7 +83,9 @@ int main()
 	for (int i = 0; i < 1000; i++) add();
 	walk();
 
+	___lookup_probes = 0;
 	foreach(it, keys) find(*it);
+	println("probes per lookup: ", ___lookup_probes/(double)len(keys));
 
 	del(7);
 
