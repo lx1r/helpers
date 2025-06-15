@@ -28,6 +28,7 @@
 #define ___fill10(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill9(ptr, p + 1, __VA_ARGS__)
 #define ___fill11(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill10(ptr, p + 1, __VA_ARGS__)
 #define ___fill12(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill11(ptr, p + 1, __VA_ARGS__)
+
 #define ___fill(ptr, ...)\
 	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
 
@@ -83,44 +84,31 @@ static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define zfree(ptr) ___zfree((void **)(ptr))
 
-#define ___HAS_USED_MASK	(1UL << (BITS_PER_LONG - 1))
 #define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
 #define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(size_t)))
-#define ___meta_len_sz()	sizeof(size_t)
 #define ___meta_used_sz(len)	((BIT_WORD((len) - 1) + 1) * sizeof(unsigned long))
 
-static inline size_t *___meta_len_ptr(void *ptr)
+struct meta {
+	size_t has_used:1;
+	size_t len:63;
+};
+
+static inline struct meta *___meta(void *ptr)
 {
-	return ptr + ___cap(ptr) - ___meta_len_sz();
+	return ptr + ___cap(ptr) - sizeof(struct meta);
 }
 
-static inline bool ___meta_has_used(size_t *len_ptr)
+static inline unsigned long *___meta_used(struct meta *meta)
 {
-	return !!(*len_ptr & ___HAS_USED_MASK);
-}
-
-static inline size_t ___meta_get_len(size_t *len_ptr)
-{
-	return *len_ptr & ~___HAS_USED_MASK;
-}
-
-static inline void ___meta_set_len(size_t *len_ptr, size_t len, bool has_used)
-{
-	*len_ptr = len;
-	if (has_used) *len_ptr |= ___HAS_USED_MASK;
-}
-
-static inline unsigned long *___meta_used_ptr(void *len_ptr)
-{
-	if (!___meta_has_used(len_ptr))
+	if (!meta->has_used)
 		return NULL;
-	size_t len = ___meta_get_len(len_ptr);
-	return (void *)len_ptr - ___meta_used_sz(len);
+	return (void *)meta - ___meta_used_sz(meta->len);
 }
 
 /**
- * @brief **len()** returns the number of elements in a dynamic
- * or an associative array
+ * @brief Returns the number of elements in a dynamic or
+ * an associative array.
+ *
  * @param pptr pointer to the dynamic or associative array
  * @return number of elements in the array
  */
@@ -128,54 +116,53 @@ static inline size_t len(void *ptr)
 {
 	if (!ptr)
 		return 0;
-	size_t *len_ptr = ___meta_len_ptr(ptr);
-	return ___meta_get_len(len_ptr);
+	return ___meta(ptr)->len;
 }
 
 static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 {
-	unsigned long *prev_used_ptr = NULL;
-	size_t prev_used_sz = 0;
 	size_t prev_len = 0;
+	unsigned long *prev_used = NULL;
+	size_t prev_used_sz = 0;
 
 	if (!len)
 		return ptr;
 
 	if (ptr) {
-		size_t *len_ptr = ___meta_len_ptr(ptr);
-		prev_used_ptr = ___meta_used_ptr(len_ptr);
-		prev_len = ___meta_get_len(len_ptr);
+		struct meta *meta = ___meta(ptr);
+		has_used = meta->has_used;
+		prev_len = meta->len;
+		prev_used = ___meta_used(meta);
 		prev_used_sz = ___meta_used_sz(prev_len);
-		if (prev_used_sz)
-			has_used = true;
 	}
 
-	ptr = realloc(ptr, sz*len + ___meta_used_sz(len) + ___meta_len_sz());
+	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_used ? ___meta_used_sz(len) : 0));
 	if (!ptr)
 		return NULL;
 
-	size_t *len_ptr = ___meta_len_ptr(ptr);
-	___meta_set_len(len_ptr, has_used ? len : prev_len, has_used);
-	unsigned long *used_ptr = ___meta_used_ptr(len_ptr);
+	struct meta *meta = ___meta(ptr);
+	meta->has_used = has_used;
+	meta->len = has_used ? len : prev_len;
 
-	if (prev_used_ptr)
-		memmove(used_ptr, prev_used_ptr, prev_used_sz);
+	unsigned long *used = ___meta_used(meta);
+	if (prev_used)
+		memmove(used, prev_used, prev_used_sz);
 	if (has_used)
-		memset(used_ptr + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
+		memset(used + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
 
 	return ptr;
 }
 
 #define ___meta_used_test(ptr, slot) ({\
-	test_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
+	test_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 #define ___meta_used_set(ptr, slot) ({\
-	set_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
+	set_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 #define ___meta_used_clear(ptr, slot) ({\
-	clear_bit(slot, ___meta_used_ptr(___meta_len_ptr(ptr)));\
+	clear_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 static inline bool used(void *ptr, ssize_t slot)
@@ -183,10 +170,10 @@ static inline bool used(void *ptr, ssize_t slot)
 	if (!ptr)
 		return false;
 
-	size_t *len_ptr = ___meta_len_ptr(ptr);
+	struct meta *meta = ___meta(ptr);
 
-	return !___meta_has_used(len_ptr) ||
-		test_bit(slot, ___meta_used_ptr(len_ptr));
+	return !meta->has_used ||
+		test_bit(slot, ___meta_used(meta));
 }
 
 #define reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
@@ -194,10 +181,12 @@ static inline bool used(void *ptr, ssize_t slot)
 #define reserve0(pptr) reserve1(pptr, 32)
 
 /**
- * @brief **reserve()** pre-allocates memory for an array
+ * @fn type *reserve(type **pptr, size len, bool map)
+ * @brief Pre-allocates memory for an array.
+ *
  * @param pptr pointer to the dynamic or associative array,
  * may be any type
- * @param len pre-allocated items count (default: 32)
+ * @param len pre-allocated items count
  * @map if true preallocate memory for an associative array
  * @return pointer to the pre-allocated array
  */
@@ -222,20 +211,24 @@ static inline size_t ___align_sz(size_t nb)
 }
 
 /**
- * @brief **append()** adds an element to the end of a dynamic array,
- * expands memory usage if necessary
+ * @fn ssize_t append(type **pptr, type init)
+ * @brief Adds an element to the end of a dynamic array, expands memory
+ * usage if necessary.
+ *
  * @param pptr pointer to the dynamic array, may be any type
  * @param init initializer for a new array element, may be an aggregate
  * initializer list
- * @return index in the array where the new value is appended
+ * @return index in the array where the new value is appended or
+ * -1 something went wrong, the index is valid until any method on the
+ * dynamic array is called
  */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
-	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + ___meta_len_sz() + 16) - 16;\
+	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + sizeof(struct meta) + 16) - 16;\
 	typeof(*(pptr)) ptr_ = realloc(*(pptr), sz_);\
 	if (ptr_) {\
 		ptr_[len_ - 1] = (typeof(*ptr_))__VA_ARGS__;\
-		*___meta_len_ptr(ptr_) = len_;\
+		___meta(ptr_)->len = len_;\
 		*(pptr) = ptr_;\
 	} else {\
 		len_ = 0;\
@@ -360,7 +353,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @brief **mapof()** associative array item declaration
+ * @brief Associative array element declaration.
+ *
  * @param key_type associative array index (key) type, can be any non-pointer
  * type except a pointer to a null terminated string
  * @param val_type a type of value associated with the key, can be any type
@@ -371,15 +365,21 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define mapof(key_type, val_type) struct { key_type key; val_type value; }
 
 /**
- * @brief **insert()** adds an element to a dynamic associative array,
- * expands memory usage if necessary
+ * @fn ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)
+ * @brief Adds an element to a dynamic associative array, expands memory
+ * usage if necessary.
+ *
+ * If an element with the same key exists, a duplicate element will be
+ * added, to prevent this, the `lookup` method should be used.
+ *
  * @param pptr pointer to the associative array, may be declared using
  * `mapof` macro
  * @param key associative array index value, maybe any standard type
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
- * @return index in the array where the new value is inserted,
- * the index is valid until any method of the associative array is called
+ * @return index in the array where the new value is inserted or
+ * -1 something went wrong, the index is valid until any method on the
+ * associative array is called
  */
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
@@ -388,7 +388,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @brief **delete()** removes an element from an associative array
+ * @fn ssize_t delete(mapof(key_type, val_type) **pptr, val_type *val_ref)
+ * @brief Removes an element from an associative array.
+ *
  * @param pptr pointer to the associative array
  * @param val_ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
@@ -404,11 +406,14 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @brief **lookup()** searches a data associated with a key
+ * @fn val_type *lookup(mapof(key_type, val_type) **pptr, key_type key)
+ * @brief Searches a data associated with a key.
+ *
  * @param pptr pointer to the associative array
  * @param key associative array key value
  * @return reference to the data that the `key` is associated with,
- * the reference is valid until any associative array method is called
+ * the reference is valid until any associative array method is called,
+ * if the key doesn't exist NULL pointer will be returned
  */
 #define lookup(pptr, k) ({\
 	typeof((*(pptr))->key) key_ = k;\
@@ -466,7 +471,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
 /**
- * @brief **fprintln()** print a line to a stream
+ * @fn int fprintln(FILE *fp, ...)
+ * @brief Prints a line to a stream.
+ *
  * @param fp output stream
  * @param ... list of values or constants of standard type to print
  * @return the number of bytes printed
@@ -481,7 +488,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @brief **println()** print a line to the standard output stream
+ * @fn int println(...)
+ * @brief Prints a line to the standard output stream.
+ *
  * @param ... list of values or constants of standard type to print
  * @return the number of bytes printed
  */
@@ -511,7 +520,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, ##__VA_ARGS__)
 
 /**
- * @brief **printv()** print an array to the standard output stream
+ * @fn int printv(type *tokens, size_t nr_tokens, const char *delim)
+ * @brief Print an array to the standard output stream.
+ *
  * @param tokens array of values or constants of standard type to print
  * @param nr_tokens number of tokens to output (default is len())
  * @param delim delimiter output between the tokens (default is a space)
@@ -564,7 +575,9 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 #define printb(bits, nr_bits, ...) fprintb(stdout, bits, nr_bits, ##__VA_ARGS__)
 
 /**
- * @brief **join()** concatenates an list of values into a single string
+ * @fn char *join(...)
+ * @brief Concatenates an list of values into a single string.
+ *
  * @param ... list of values or constants of standard type to join
  * @return the pointer to joined string, should be released by calling `free()`
  */
@@ -608,7 +621,9 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 #define joinv0(tokens) joinv1(tokens, len(tokens))
 
 /**
- * @brief **joinv()** concatenates an array into a single string
+ * @fn char *joinv(type *tokens, size_t nr_tokens, const char *delim)
+ * @brief Concatenates an array into a single string.
+ *
  * @param tokens array of values or constants of standard type to join
  * @param nr_tokens number of elements to join (default is len(tokens))
  * @param delim substring between the joined elements (default is a space)
@@ -654,8 +669,10 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 #define ___split12(str, delim, p, ...) ___splitn(str, delim, p); ___split11(str, delim, __VA_ARGS__)
 
 /**
- * @brief **split()** splits a string into tokens and assigns
- * the token values to the specified list of variables
+ * @fn void split(const char *str, const char *delim, ...)
+ * @brief Splits a string into tokens and assigns the token values
+ * to the specified list of variables.
+ *
  * @param str the string to be parsed
  * @param delim substring delimits the tokens in the parsed string
  * @param ... list of pointers to variables to assign token values to
@@ -672,10 +689,12 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 })
 
 /**
- * @brief **splitv()** splits a string into tokens and assigns
- * the token values to a list
+ * @fn void split(const char *str, const char *delim, type **pptr)
+ * @brief Splits a string into tokens and adds the token values
+ * to a dynamic array.
+ *
  * @param str string to be parsed
- * @param delima substring separates tokens in the parsed string
+ * @param delim substring separates tokens in the parsed string
  * @param pptr pointer to a list to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
