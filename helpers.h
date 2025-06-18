@@ -50,6 +50,8 @@
 #define BIT_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
 
+#include <stdbool.h>
+
 static __always_inline bool test_bit(unsigned long nr, unsigned long *bits)
 {
 	if (bits[BIT_WORD(nr)] & BIT_MASK(nr))
