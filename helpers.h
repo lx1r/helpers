@@ -108,11 +108,13 @@ static inline unsigned long *___meta_used(struct meta *meta)
 }
 
 /**
- * @brief Returns the number of elements in a dynamic or
- * an associative array.
+ * @fn size_t len(void *ptr)
  *
- * @param pptr pointer to the dynamic or associative array
- * @return number of elements in the array
+ * @brief Returns the number of elements in a dynamic or an associative array.
+ *
+ * @param ptr pointer to the dynamic or associative array
+ *
+ * @return Number of elements in the array.
  */
 static inline size_t len(void *ptr)
 {
@@ -184,13 +186,15 @@ static inline bool used(void *ptr, ssize_t slot)
 
 /**
  * @fn type *reserve(type **pptr, size len, bool map)
+ *
  * @brief Pre-allocates memory for an array.
  *
  * @param pptr pointer to the dynamic or associative array,
  * may be any type
  * @param len pre-allocated items count
- * @map if true preallocate memory for an associative array
- * @return pointer to the pre-allocated array
+ * @param map if true preallocate memory for an associative array
+ *
+ * @return Pointer to the pre-allocated array.
  */
 #define reserve(pptr, ...)\
 	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
@@ -214,15 +218,17 @@ static inline size_t ___align_sz(size_t nb)
 
 /**
  * @fn ssize_t append(type **pptr, type init)
+ *
  * @brief Adds an element to the end of a dynamic array, expands memory
  * usage if necessary.
  *
  * @param pptr pointer to the dynamic array, may be any type
  * @param init initializer for a new array element, may be an aggregate
  * initializer list
- * @return index in the array where the new value is appended or
+ *
+ * @return Index in the array where the new value is appended or
  * -1 something went wrong, the index is valid until any method on the
- * dynamic array is called
+ * dynamic array is called.
  */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
@@ -355,7 +361,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @brief Associative array element declaration.
+ * @def mapof(key_type, val_type)
+ *
+ * @brief Associative array element type.
  *
  * @param key_type associative array index (key) type, can be any non-pointer
  * type except a pointer to a null terminated string
@@ -368,6 +376,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)
+ *
  * @brief Adds an element to a dynamic associative array, expands memory
  * usage if necessary.
  *
@@ -379,9 +388,10 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * @param key associative array index value, maybe any standard type
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
- * @return index in the array where the new value is inserted or
+ *
+ * @return Index in the array where the new value is inserted or
  * -1 something went wrong, the index is valid until any method on the
- * associative array is called
+ * associative array is called.
  */
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
@@ -391,13 +401,15 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn ssize_t delete(mapof(key_type, val_type) **pptr, val_type *val_ref)
+ *
  * @brief Removes an element from an associative array.
  *
  * @param pptr pointer to the associative array
  * @param val_ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
- * @return index in the array that `val_ref` belonged to,
- * the index is valid until any associative array method is called
+ *
+ * @return Index in the array that `val_ref` belonged to,
+ * the index is valid until any associative array method is called.
  */
 #define delete(pptr, val_ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
@@ -409,13 +421,15 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn val_type *lookup(mapof(key_type, val_type) **pptr, key_type key)
+ *
  * @brief Searches a data associated with a key.
  *
  * @param pptr pointer to the associative array
  * @param key associative array key value
- * @return reference to the data that the `key` is associated with,
+ *
+ * @return Reference to the data that the `key` is associated with,
  * the reference is valid until any associative array method is called,
- * if the key doesn't exist NULL pointer will be returned
+ * if the key doesn't exist NULL pointer will be returned.
  */
 #define lookup(pptr, k) ({\
 	typeof((*(pptr))->key) key_ = k;\
@@ -474,11 +488,13 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn int fprintln(FILE *fp, ...)
+ *
  * @brief Prints a line to a stream.
  *
  * @param fp output stream
  * @param ... list of values or constants of standard type to print
- * @return the number of bytes printed
+ *
+ * @return The number of bytes printed.
  */
 #define fprintln(fp, ...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 2];\
@@ -491,10 +507,12 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn int println(...)
+ *
  * @brief Prints a line to the standard output stream.
  *
  * @param ... list of values or constants of standard type to print
- * @return the number of bytes printed
+ *
+ * @return The number of bytes printed.
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
@@ -523,12 +541,14 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 /**
  * @fn int printv(type *tokens, size_t nr_tokens, const char *delim)
+ *
  * @brief Print an array to the standard output stream.
  *
  * @param tokens array of values or constants of standard type to print
  * @param nr_tokens number of tokens to output (default is len())
  * @param delim delimiter output between the tokens (default is a space)
- * @return the number of bytes printed
+ *
+ * @return The number of bytes printed.
  */
 #define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
 
@@ -578,10 +598,12 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 
 /**
  * @fn char *join(...)
+ *
  * @brief Concatenates an list of values into a single string.
  *
  * @param ... list of values or constants of standard type to join
- * @return the pointer to joined string, should be released by calling `free()`
+ *
+ * @return The pointer to joined string, should be released by calling `free()`.
  */
 #define join(...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
@@ -624,12 +646,14 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 
 /**
  * @fn char *joinv(type *tokens, size_t nr_tokens, const char *delim)
+ *
  * @brief Concatenates an array into a single string.
  *
  * @param tokens array of values or constants of standard type to join
  * @param nr_tokens number of elements to join (default is len(tokens))
  * @param delim substring between the joined elements (default is a space)
- * @return the pointer to joined string, should be released by calling `free()`
+ *
+ * @return The pointer to joined string, should be released by calling `free()`.
  */
 #define joinv(tokens, ...)\
 	___apply(joinv, ___narg(__VA_ARGS__))(tokens, ##__VA_ARGS__)
@@ -672,6 +696,7 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 
 /**
  * @fn void split(const char *str, const char *delim, ...)
+ *
  * @brief Splits a string into tokens and assigns the token values
  * to the specified list of variables.
  *
@@ -691,7 +716,8 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 })
 
 /**
- * @fn void split(const char *str, const char *delim, type **pptr)
+ * @fn void splitv(const char *str, const char *delim, type **pptr)
+ *
  * @brief Splits a string into tokens and adds the token values
  * to a dynamic array.
  *
