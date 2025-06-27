@@ -46,7 +46,8 @@
 #define ALIGN_DOWN(x, a)	ALIGN((x) - ((a) - 1), (a))
 #define ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 
-#define BITS_PER_LONG	64
+#define BITS_PER_BYTE	8
+#define BITS_PER_LONG	(sizeof(unsigned long)*BITS_PER_BYTE)
 #define BIT_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
 
@@ -734,7 +735,7 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 	}\
 })
 
-static inline int splitb(const char *str, const char *delim, const char **tokens,
+static inline int splitvb(const char *str, const char *delim, const char **tokens,
 			 int nr_tokens, unsigned long *bits)
 {
 	char __defer(free) *dup = strdup(str);
@@ -747,6 +748,38 @@ static inline int splitb(const char *str, const char *delim, const char **tokens
 				set_bit(i, bits);
 	}
 	return 0;
+}
+
+static inline int splitb(const char *str, const char *comma, const char *dash,
+                         unsigned long *bits, unsigned long nr_bits)
+{
+        char __defer(free) *dup = strdup(str);
+        if (!dup)
+                return -1;
+
+        char *comma_ptr;
+        for (char *tok = strtok_r(dup, comma, &comma_ptr); tok;
+             tok = strtok_r(NULL, comma, &comma_ptr)) {
+
+                char *dash_ptr;
+                char *start_str = strtok_r(tok, dash, &dash_ptr);
+                char *end_str = strtok_r(NULL, dash, &dash_ptr);
+
+                if (start_str) {
+                        unsigned long end, start;
+
+                        start = atol(start_str);
+                        if (end_str)
+                                end = atol(end_str);
+                        else
+                                end = start;
+                        if (!(start < nr_bits && end < nr_bits))
+                                continue;
+                        for (unsigned long i = start; i <= end; i++)
+                                set_bit(i, bits);
+                }
+        }
+        return 0;
 }
 
 #define ___decl1(x) x;
