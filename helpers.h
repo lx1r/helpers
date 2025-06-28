@@ -535,7 +535,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 #define fprintv2(fp, tokens, nr_tokens, delim) ___printv(fp, tokens, nr_tokens, delim)
-#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, " ")
+#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, ",")
 #define fprintv0(fp, tokens) fprintv1(fp, tokens, len(tokens))
 #define fprintv(fp, tokens, ...)\
 	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, ##__VA_ARGS__)
@@ -642,7 +642,7 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
 })
 
 #define joinv2(tokens, nr_tokens, delim) ___joinv(tokens, nr_tokens, delim)
-#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, " ")
+#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, ",")
 #define joinv0(tokens) joinv1(tokens, len(tokens))
 
 /**

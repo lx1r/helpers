@@ -36,7 +36,7 @@ int main()
 	char *str = joinv(nums);
 	println("str=", str);
 	println("str=", joinv(nums, len(nums) - 1));
-	println("str=", joinv(nums, len(nums) - 2, " - "));
+	println("str=", joinv(nums, len(nums) - 2, "--"));
 
 	printb(nums, len(nums)*BITS_PER_LONG);
 	println();
