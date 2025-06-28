@@ -553,8 +553,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
 
-static inline void ___fprint_bit_seq(FILE *fp, unsigned long start, unsigned long end,
-				     const char **period_ptr, const char *comma, const char *dash)
+static inline void ___fprint_bits(FILE *fp, unsigned long start, unsigned long end,
+				  const char **period_ptr, const char *comma, const char *dash)
 {
 	if (start == -1)
 		return;
@@ -571,7 +571,7 @@ static inline void ___fprint_bit_seq(FILE *fp, unsigned long start, unsigned lon
 	*period_ptr = comma;
 }
 
-static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long nr_bits,
+static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long nr_bits,
 				  const char *comma, const char *dash)
 {
 	const char *period = "";
@@ -583,14 +583,14 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 				start = i;
 			end = i;
 		} else {
-			___fprint_bit_seq(fp, start, end, &period, comma, dash);
+			___fprint_bits(fp, start, end, &period, comma, dash);
 			start = -1;
 		}
 	}
-	___fprint_bit_seq(fp, start, end, &period, comma, dash);
+	___fprint_bits(fp, start, end, &period, comma, dash);
 }
 
-#define fprintb1(fp, bits, nr_bits, comma) ___fprint_bits(fp, bits, nr_bits, comma, "-")
+#define fprintb1(fp, bits, nr_bits, comma) ___fprint_mask(fp, bits, nr_bits, comma, "-")
 #define fprintb0(fp, bits, nr_bits) fprintb1(fp, bits, nr_bits, ",")
 #define fprintb(fp, bits, nr_bits, ...)\
 	___apply(fprintb, ___narg(__VA_ARGS__))(fp, bits, nr_bits, ##__VA_ARGS__)
@@ -717,70 +717,87 @@ static inline void ___fprint_bits(FILE *fp, unsigned long *bits, unsigned long n
 })
 
 /**
- * @fn void splitv(const char *str, const char *delim, type **pptr)
+ * @fn void splitv(type **pptr, const char *str, const char *delim)
  *
  * @brief Splits a string into tokens and adds the token values
  * to a dynamic array.
  *
+ * @param pptr pointer to a list to assign token values to
  * @param str string to be parsed
  * @param delim substring separates tokens in the parsed string
- * @param pptr pointer to a list to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
  */
-#define splitv(str, delim, pptr) ({\
+#define ___splitv(pptr, str, delim) ({\
 	char *__defer(free) dup_ = strdup(str);\
-	for (char *token_ = strtok(dup_, delim); token_; token_ = strtok(NULL, delim)) {\
-		append(pptr, ___strto(**(pptr), token_));\
+	for (char *tok_ = strtok(dup_, delim); tok_; tok_ = strtok(NULL, delim)) {\
+		append(pptr, ___strto(**(pptr), tok_));\
 	}\
 })
 
-static inline int splitvb(const char *str, const char *delim, const char **tokens,
-			 int nr_tokens, unsigned long *bits)
+#define splitv1(pptr, str, delim) ___splitv(pptr, str, delim)
+#define splitv0(pptr, str) splitv1(pptr, str, ",")
+#define splitv(pptr, str, ...)\
+	___apply(splitv, ___narg(__VA_ARGS__))(pptr, str, ##__VA_ARGS__)
+
+static inline int ___splitv_mask(unsigned long *bits, unsigned long nr_bits,
+				 const char *str, const char **tokens, const char *delim)
 {
 	char __defer(free) *dup = strdup(str);
 	if (!dup)
 		return -1;
 
-	for (char *token = strtok(dup, delim); token; token = strtok(NULL, delim)) {
-		for (int i = 0; i < nr_tokens; i++)
-			if (strcmp(token, tokens[i]) == 0)
+	for (char *tok = strtok(dup, delim); tok; tok = strtok(NULL, delim)) {
+		for (int i = 0; i < nr_bits; i++)
+			if (strcmp(tok, tokens[i]) == 0)
 				set_bit(i, bits);
 	}
 	return 0;
 }
 
-static inline int splitb(const char *str, const char *comma, const char *dash,
-                         unsigned long *bits, unsigned long nr_bits)
+#define splitvb1(bits, nr_bits, str, tokens, delim) ___splitv_mask(bits, nr_bits, str, tokens, delim)
+#define splitvb0(bits, nr_bits, str, tokens) splitvb1(bits, nr_bits, str, tokens, ",")
+#define splitvb(bits, nr_bits, str, tokens, ...)\
+	___apply(splitvb, ___narg(__VA_ARGS__))(bits, nr_bits, str, tokens, ##__VA_ARGS__)
+
+static inline int ___split_mask(unsigned long *bits, unsigned long nr_bits,
+				const char *str, const char *comma, const char *dash)
 {
-        char __defer(free) *dup = strdup(str);
-        if (!dup)
-                return -1;
+	char __defer(free) *dup = strdup(str);
+	if (!dup)
+		return -1;
 
-        char *comma_ptr;
-        for (char *tok = strtok_r(dup, comma, &comma_ptr); tok;
-             tok = strtok_r(NULL, comma, &comma_ptr)) {
+	char *comma_ptr;
+	for (char *tok = strtok_r(dup, comma, &comma_ptr); tok;
+	     tok = strtok_r(NULL, comma, &comma_ptr)) {
 
-                char *dash_ptr;
-                char *start_str = strtok_r(tok, dash, &dash_ptr);
-                char *end_str = strtok_r(NULL, dash, &dash_ptr);
+		char *dash_ptr;
+		char *start_str = strtok_r(tok, dash, &dash_ptr);
+		char *end_str = strtok_r(NULL, dash, &dash_ptr);
 
-                if (start_str) {
-                        unsigned long end, start;
+		if (start_str) {
+			unsigned long end, start;
 
-                        start = atol(start_str);
-                        if (end_str)
-                                end = atol(end_str);
-                        else
-                                end = start;
-                        if (!(start < nr_bits && end < nr_bits))
-                                continue;
-                        for (unsigned long i = start; i <= end; i++)
-                                set_bit(i, bits);
-                }
-        }
-        return 0;
+			start = atol(start_str);
+			if (end_str)
+				end = atol(end_str);
+			else
+				end = start;
+			if (!(start < nr_bits && end < nr_bits))
+				continue;
+			for (unsigned long i = start; i <= end; i++)
+				set_bit(i, bits);
+		}
+	}
+	return 0;
 }
+
+#define splitb2(bits, nr_bits, str, comma, dash) ___split_mask(bits, nr_bits, str, comma, dash)
+#define splitb1(bits, nr_bits, str, comma) splitb2(bits, nr_bits, str, comma, "-")
+#define splitb0(bits, nr_bits, str) splitb1(bits, nr_bits, str, ",")
+#define splitb(bits, nr_bits, str, ...)\
+	___apply(splitb, ___narg(__VA_ARGS__))(bits, nr_bits, str, ##__VA_ARGS__)
+
 
 #define ___decl1(x) x;
 #define ___decl2(x, ...) x; ___decl1(__VA_ARGS__)
