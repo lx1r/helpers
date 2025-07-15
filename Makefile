@@ -2,7 +2,7 @@
 
 .PHONY: all test clean
 
-CFLAGS=-I.. -Wall
+CFLAGS=-I.. -Wall -Wfatal-errors
 sources = $(wildcard *.c)
 headers = $(wildcard *.h)
 tests = $(sources:.c=)
@@ -11,7 +11,7 @@ test: $(tests)
 
 %: %.c $(headers)
 
-	@gcc $(CFLAGS) $< -o $@ 
+	@gcc $(CFLAGS) $< -o $@
 	@echo -n running $@...
 	-@./$@ > $@.log
 	-@diff $@.log $@.cmp > /dev/null && echo ok

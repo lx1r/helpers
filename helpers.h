@@ -659,6 +659,36 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
 #define joinv(tokens, ...)\
 	___apply(joinv, ___narg(__VA_ARGS__))(tokens, ##__VA_ARGS__)
 
+static inline char *___subtok(const char *str, const char *delim, const char **next)
+{
+	size_t tok_len;
+	size_t delim_len = strlen(delim);
+
+	if (!str)
+		str = *next;
+	if (!str)
+		return NULL;
+
+	char *found_delim;
+	/* ignore leading delim */
+	while ((found_delim = strstr(str, delim)) == str)
+		str += delim_len;
+
+	if (found_delim) {
+		tok_len = found_delim - str;
+		*next = found_delim + delim_len;
+	} else {
+		tok_len = strlen(str);
+		*next = NULL;
+		if (!tok_len) /* ignore trailing delim */
+			return NULL;
+	}
+	char *tok = malloc(tok_len + 1);
+	memcpy(tok, str, tok_len);
+	tok[tok_len] = '\0';
+	return tok;
+}
+
 #define ___strto(x, s) ({\
 	const char *str_ = s;\
 	(str_) ? \
@@ -681,7 +711,12 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
 		 char *:                strdup(str_)) : 0;\
 })
 
-#define ___splitn(str, delim, p) *(p) = ___strto(*(p), strtok(NULL, delim))
+#define ___splitn(str, delim, p) ({\
+        char *tok_ = ___subtok(NULL, delim, &next_);\
+        *(p) = ___strto(*(p), tok_);\
+        free(tok_);\
+})
+
 #define ___split1(str, delim)
 #define ___split2(str, delim, p) ___splitn(str, delim, p)
 #define ___split3(str, delim, p, ...) ___splitn(str, delim, p); ___split2(str, delim, __VA_ARGS__)
@@ -711,8 +746,10 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
  * calling `free()`.
  */
 #define split(str, delim, p, ...) ({\
-	char *__defer(free) dup_ = strdup(str);\
-	*(p) = ___strto(*(p), strtok(dup_, delim));\
+	const char *next_;\
+	char *tok_ = ___subtok(str, delim, &next_);\
+	*(p) = ___strto(*(p), tok_);\
+	free(tok_);\
 	___apply(___split, ___narg(p, __VA_ARGS__))(dup_, delim, ##__VA_ARGS__);\
 })
 
@@ -729,9 +766,10 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
  * Tokens will be converted to the target type before assignment.
  */
 #define ___splitv(pptr, str, delim) ({\
-	char *__defer(free) dup_ = strdup(str);\
-	for (char *tok_ = strtok(dup_, delim); tok_; tok_ = strtok(NULL, delim)) {\
+	const char *next_;\
+	for (char *tok_ = ___subtok(str, delim, &next_); tok_; tok_ = ___subtok(NULL, delim, &next_)) {\
 		append(pptr, ___strto(**(pptr), tok_));\
+		free(tok_);\
 	}\
 })
 
