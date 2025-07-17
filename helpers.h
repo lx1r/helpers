@@ -126,10 +126,10 @@ static inline size_t len(void *ptr)
 
 static inline void ___pvfree(void *pptr)
 {
-        void **ptr = *(void ***)pptr;
-        for (size_t i = 0; i < len(ptr); i++)
-                free(ptr[i]);
-        free(ptr);
+	void **ptr = *(void ***)pptr;
+	for (size_t i = 0; i < len(ptr); i++)
+		free(ptr[i]);
+	free(ptr);
 }
 
 static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
@@ -714,9 +714,9 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 })
 
 #define ___splitn(str, delim, p) ({\
-        char *tok_ = ___subtok(NULL, delim, &next_);\
-        *(p) = ___strto(*(p), tok_);\
-        free(tok_);\
+	char *tok_ = ___subtok(NULL, delim, &next_);\
+	*(p) = ___strto(*(p), tok_);\
+	free(tok_);\
 })
 
 #define ___split1(str, delim)

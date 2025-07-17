@@ -8,41 +8,67 @@ sub=first
 sub=middle
 sub=last
 
-tokens[0]=middle
-tokens[1]=last
+tokens[0]=
+tokens[1]=middle
+tokens[2]=last
 delim=$token-comma$
 str=$token-comma$middle$token-comma$last
-res=middle:_-_:last
+res=:_-_:middle:_-_:last
+sub=
 sub=middle
 sub=last
 
 tokens[0]=first
 tokens[1]=middle
+tokens[2]=
 delim=$token-comma$
 str=first$token-comma$middle$token-comma$
-res=first:_-_:middle
+res=first:_-_:middle:_-_:
 sub=first
 sub=middle
+sub=
 
-tokens[0]=middle
+tokens[0]=
+tokens[1]=middle
+tokens[2]=
 delim=$token-comma$
 str=$token-comma$middle$token-comma$
-res=middle
+res=:_-_:middle:_-_:
+sub=
 sub=middle
+sub=
 
-tokens[0]=middle
+tokens[0]=
+tokens[1]=
+tokens[2]=middle
+tokens[3]=
+tokens[4]=
 delim=$token-comma$
 str=$token-comma$$token-comma$middle$token-comma$$token-comma$
-res=middle
+res=:_-_::_-_:middle:_-_::_-_:
+sub=
+sub=
 sub=middle
+sub=
+sub=
 
-tokens[0]=middle1
-tokens[1]=middle2
+tokens[0]=
+tokens[1]=
+tokens[2]=middle1
+tokens[3]=
+tokens[4]=middle2
+tokens[5]=
+tokens[6]=
 delim=$token-comma$
 str=$token-comma$$token-comma$middle1$token-comma$$token-comma$middle2$token-comma$$token-comma$
-res=middle1:_-_:middle2
+res=:_-_::_-_:middle1:_-_::_-_:middle2:_-_::_-_:
+sub=
+sub=
 sub=middle1
+sub=
 sub=middle2
+sub=
+sub=
 
 tokens[0]=$notokens$
 delim=$token-comma$
@@ -50,9 +76,11 @@ str=$notokens$
 res=$notokens$
 sub=$notokens$
 
+tokens[0]=
 delim=$token-comma$
 str=
 res=
+sub=
 
 delim=/
 str=dir1/dir2/dir3
@@ -68,9 +96,9 @@ dir2=di/r3
 
 delim=$tod$
 str=$tod$dir1$tod$dir2$tod$dir3$tod$
-dir0=dir1
-dir1=dir2
-dir2=dir3
+dir0=
+dir1=dir1
+dir2=dir2
 
 delim=$tod$
 str=dir1$tod$dir2$tod$dir3
