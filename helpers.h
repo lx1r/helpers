@@ -124,6 +124,14 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
+static inline void ___pvfree(void *pptr)
+{
+        void **ptr = *(void ***)pptr;
+        for (size_t i = 0; i < len(ptr); i++)
+                free(ptr[i]);
+        free(ptr);
+}
+
 static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 {
 	size_t prev_len = 0;
@@ -669,19 +677,13 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 	if (!str)
 		return NULL;
 
-	char *found_delim;
-	/* ignore leading delim */
-	while ((found_delim = strstr(str, delim)) == str)
-		str += delim_len;
-
+	char *found_delim = strstr(str, delim);
 	if (found_delim) {
 		tok_len = found_delim - str;
 		*next = found_delim + delim_len;
 	} else {
 		tok_len = strlen(str);
 		*next = NULL;
-		if (!tok_len) /* ignore trailing delim */
-			return NULL;
 	}
 	char *tok = malloc(tok_len + 1);
 	memcpy(tok, str, tok_len);
@@ -746,7 +748,7 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
  * calling `free()`.
  */
 #define split(str, delim, p, ...) ({\
-	const char *next_;\
+	const char *next_ = NULL;\
 	char *tok_ = ___subtok(str, delim, &next_);\
 	*(p) = ___strto(*(p), tok_);\
 	free(tok_);\
@@ -766,7 +768,7 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
  * Tokens will be converted to the target type before assignment.
  */
 #define ___splitv(pptr, str, delim) ({\
-	const char *next_;\
+	const char *next_ = NULL;\
 	for (char *tok_ = ___subtok(str, delim, &next_); tok_; tok_ = ___subtok(NULL, delim, &next_)) {\
 		append(pptr, ___strto(**(pptr), tok_));\
 		free(tok_);\
