@@ -1,5 +1,7 @@
 #include "helpers.h"
 
+mapof(int, int) *ptr = NULL, *prev;
+int *keys = NULL;
 
 static inline unsigned xrand()
 {
@@ -8,37 +10,28 @@ static inline unsigned xrand()
 	return seed;
 }
 
-int *keys = NULL;
-mapof(int, int) *ptr = NULL, *prev;
-
-void add(mapof(int, int) **pptr)
+void add()
 {
 	int key = xrand() & 0xffff;
 	int data = xrand() & 0xfff;
-	void *prev = *pptr;
+	void *prev = ptr;
 
 	println("insert: key=", key, " data=", data);
-	insert(pptr, key, data) ;
-	if (prev != *pptr)
-		println("rehash: ", len(*pptr));
+	insert(&ptr, key, data) ;
+	if (prev != ptr)
+		println("rehash: ", len(ptr));
 
 	append(&keys, key);
 }
 
-void find(int key, mapof(int, int) **pptr)
+void find(int key)
 {
-	int *data = lookup(pptr, key);
+	int *data = lookup(&ptr, key);
 	if (data)
 		println("lookup: key=", key, " data=", *data);
 	else
 		println("lookup: key=", key, " not found");
 }
-
-int xxx_pair(mapof(int, char *) *xpair)
-{
-	return xpair->key;
-}
-
 
 void del(int key)
 {
@@ -48,14 +41,14 @@ void del(int key)
 		return;
 	}
 	delete(&ptr, data);
-	find(key, &ptr);
+	find(key);
 }
 
 #define foreach1(ref, ptr, len) \
 	for (typeof(ptr) (ref) = (ptr); (ref) < (ptr) + len; (ref)++) \
 
 #define foreach(ref, ptr) \
-	for (auto (ref) = (ptr); (ref) < (ptr) + len(ptr); (ref)++) \
+	for (typeof(ptr) (ref) = (ptr); (ref) < (ptr) + len(ptr); (ref)++) \
 	if (used(ptr, (ref) - (ptr)))
 
 void walk()
@@ -72,7 +65,7 @@ int main()
 	println("ALIGN_DOWN(", sizeof(unsigned long), ")=", ALIGN_DOWN(sizeof(unsigned long), sizeof(unsigned long)));
 	println("ALIGN_DOWN(40)=", ALIGN_DOWN(40, sizeof(unsigned long)));
 
-	find(7, &ptr);
+	find(7);
 
 	insert(&ptr, 1, 11);
 	insert(&ptr, 8, 18);
@@ -87,11 +80,11 @@ int main()
 
 	insert(&ptr, 7, 17);
 
-	for (int i = 0; i < 1000; i++) add(&ptr);
+	for (int i = 0; i < 1000; i++) add();
 	walk();
 
 	___lookup_probes = 0;
-	foreach(it, keys) find(*it, &ptr);
+	foreach(it, keys) find(*it);
 	println("probes per lookup: ", ___lookup_probes/(double)len(keys));
 
 	del(7);
