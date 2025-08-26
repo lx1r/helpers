@@ -124,6 +124,12 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
+#define ___foreach0(e, list) ___foreach1(e, list, len(list))
+#define ___foreach1(e, list, n) for (typeof(list) e = list; e < (list) + (n); e++)
+
+#define foreach(e, list, ...) \
+	___apply(___foreach, ___narg(__VA_ARGS__))(e, list, ##__VA_ARGS__)
+
 static inline void ___pvfree(void *pptr)
 {
 	void **ptr = *(void ***)pptr;
