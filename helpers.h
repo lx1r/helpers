@@ -124,6 +124,12 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
+#define ___foreach0(e, list) foreach1(e, list, len(list))
+#define ___foreach1(e, list, n) for (typeof(list) e = list; e < (list) + (n); e++)
+
+#define foreach1(e, list, ...) \
+	___apply(___foreach, ___narg(__VA_ARGS__))(e, list, ##__VA_ARGS__)
+
 static inline void ___pvfree(void *pptr)
 {
 	void **ptr = *(void ***)pptr;
@@ -381,7 +387,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * To pass associative array pointers to functions, the associative array type
  * must be fully qualified using the `typedef` keyword.
  */
-#define mapof(key_type, val_type) struct { key_type key; val_type value; }
+#define mapof(key_type, val_type) struct pair { key_type key; val_type value; }
 
 /**
  * @fn ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)
