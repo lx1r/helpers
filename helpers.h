@@ -125,7 +125,7 @@ static inline size_t len(void *ptr)
 }
 
 #define ___foreach0(ref, ptr) ___foreach1(ref, ptr, len(ptr))
-#define ___foreach1(ref, ptr, n) for (typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
+#define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
 #define foreach(ref, ptr, ...) \
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
