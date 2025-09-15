@@ -473,6 +473,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 		 long double:           ___fill_shift(ptr, '%', 'L', 'f'),\
 		 char *:                ___fill_shift(ptr, '%', 's'),\
 		 const char *:          ___fill_shift(ptr, '%', 's'),\
+		 volatile char *:       ___fill_shift(ptr, '%', 's'),\
+		 volatile const char *: ___fill_shift(ptr, '%', 's'),\
 		 default:               ___fill_shift(ptr, '%', 'p'))
 
 #define ___fill_fmt0(ptr, x)
@@ -758,7 +760,7 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 	char *tok_ = ___subtok(str, delim, &next_);\
 	*(p) = ___strto(*(p), tok_);\
 	free(tok_);\
-	___apply(___split, ___narg(p, __VA_ARGS__))(dup_, delim, ##__VA_ARGS__);\
+	___apply(___split, ___narg(p, ##__VA_ARGS__))(str, delim, ##__VA_ARGS__);\
 })
 
 /**
