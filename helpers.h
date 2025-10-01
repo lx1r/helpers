@@ -656,8 +656,8 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	return tok;
 }
 
-#define ___to_str(x, s) ({\
-	const char *str_ = s;\
+#define ___from_str(str, x) ({\
+	const char *str_ = str;\
 	(str_) ? \
 	_Generic(x,\
 		 _Bool:                 strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
@@ -678,24 +678,24 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 		 char *:                strdup(str_)) : 0;\
 })
 
-#define ___get_str_tok(str, sep, p) ({\
-	char *tok_ = ___get_tok(str, sep, &next_);\
-	*(p) = ___to_str(*(p), tok_);\
+#define ___get_val(str, sep, next, p) ({\
+	char *tok_ = ___get_tok(str, sep, &next);\
+	*(p) = ___from_str(tok_, *(p));\
 	free(tok_);\
 })
 
-#define ___split1(str, sep)
-#define ___split2(str, sep, p) ___get_str_tok(NULL, sep, p)
-#define ___split3(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split2(str, sep, __VA_ARGS__)
-#define ___split4(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split3(str, sep, __VA_ARGS__)
-#define ___split5(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split4(str, sep, __VA_ARGS__)
-#define ___split6(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split5(str, sep, __VA_ARGS__)
-#define ___split7(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split6(str, sep, __VA_ARGS__)
-#define ___split8(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split7(str, sep, __VA_ARGS__)
-#define ___split9(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split8(str, sep, __VA_ARGS__)
-#define ___split10(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split9(str, sep, __VA_ARGS__)
-#define ___split11(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split10(str, sep, __VA_ARGS__)
-#define ___split12(str, sep, p, ...) ___get_str_tok(NULL, sep, p); ___split11(str, sep, __VA_ARGS__)
+#define ___split1(sep, next)
+#define ___split2(sep, next, p) ___get_val(NULL, sep, next, p)
+#define ___split3(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split2(sep, next, __VA_ARGS__)
+#define ___split4(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split3(sep, next, __VA_ARGS__)
+#define ___split5(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split4(sep, next, __VA_ARGS__)
+#define ___split6(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split5(sep, next, __VA_ARGS__)
+#define ___split7(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split6(sep, next, __VA_ARGS__)
+#define ___split8(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split7(sep, next, __VA_ARGS__)
+#define ___split9(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split8(sep, next, __VA_ARGS__)
+#define ___split10(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split9(sep, next, __VA_ARGS__)
+#define ___split11(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split10(sep, next, __VA_ARGS__)
+#define ___split12(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split11(sep, next, __VA_ARGS__)
 
 /**
  * @fn void split(const char *str, const char *sep, ...)
@@ -714,8 +714,8 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
  */
 #define split(str, sep, p, ...) ({\
 	const char *next_ = NULL;\
-	___get_str_tok(str, sep, p);\
-	___apply(___split, ___narg(p, ##__VA_ARGS__))(str, sep, ##__VA_ARGS__);\
+	___get_val(str, sep, next_, p);\
+	___apply(___split, ___narg(p, ##__VA_ARGS__))(sep, next_, ##__VA_ARGS__);\
 })
 
 /**
@@ -733,7 +733,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define splitv(str, sep, pptr) ({\
 	const char *next_ = NULL;\
 	for (char *tok_ = ___get_tok(str, sep, &next_); tok_; tok_ = ___get_tok(NULL, sep, &next_)) {\
-		append(pptr, ___to_str(**(pptr), tok_));\
+		append(pptr, ___from_str(tok_, **(pptr)));\
 		free(tok_);\
 	}\
 })
