@@ -632,7 +632,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define joinv(sep, tokens, ...)\
 	___apply(joinv, ___narg(__VA_ARGS__))(sep, tokens, ##__VA_ARGS__)
 
-static inline char *___subtok(const char *str, const char *sep, const char **next)
+static inline char *___get_tok(const char *str, const char *sep, const char **next)
 {
 	size_t tok_len;
 	size_t sep_len = strlen(sep);
@@ -656,7 +656,7 @@ static inline char *___subtok(const char *str, const char *sep, const char **nex
 	return tok;
 }
 
-#define ___strto(x, s) ({\
+#define ___to_str(x, s) ({\
 	const char *str_ = s;\
 	(str_) ? \
 	_Generic(x,\
@@ -678,9 +678,11 @@ static inline char *___subtok(const char *str, const char *sep, const char **nex
 		 char *:                strdup(str_)) : 0;\
 })
 
+//#define ___get_str_tok(str, sep, p) ({\
+
 #define ___splitn(str, sep, p) ({\
-	char *tok_ = ___subtok(NULL, sep, &next_);\
-	*(p) = ___strto(*(p), tok_);\
+	char *tok_ = ___get_tok(NULL, sep, &next_);\
+	*(p) = ___to_str(*(p), tok_);\
 	free(tok_);\
 })
 
@@ -714,8 +716,8 @@ static inline char *___subtok(const char *str, const char *sep, const char **nex
  */
 #define split(str, sep, p, ...) ({\
 	const char *next_ = NULL;\
-	char *tok_ = ___subtok(str, sep, &next_);\
-	*(p) = ___strto(*(p), tok_);\
+	char *tok_ = ___get_tok(str, sep, &next_);\
+	*(p) = ___to_str(*(p), tok_);\
 	free(tok_);\
 	___apply(___split, ___narg(p, ##__VA_ARGS__))(str, sep, ##__VA_ARGS__);\
 })
@@ -734,8 +736,8 @@ static inline char *___subtok(const char *str, const char *sep, const char **nex
  */
 #define splitv(str, sep, pptr) ({\
 	const char *next_ = NULL;\
-	for (char *tok_ = ___subtok(str, sep, &next_); tok_; tok_ = ___subtok(NULL, sep, &next_)) {\
-		append(pptr, ___strto(**(pptr), tok_));\
+	for (char *tok_ = ___get_tok(str, sep, &next_); tok_; tok_ = ___get_tok(NULL, sep, &next_)) {\
+		append(pptr, ___to_str(**(pptr), tok_));\
 		free(tok_);\
 	}\
 })

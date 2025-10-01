@@ -13,7 +13,7 @@ void test_vstr(char *str, char *sep)
 	println("res=", res);
 
 	const char *next;
-	for (char *s = ___subtok(str, sep, &next); s; s = ___subtok(NULL, sep, &next))
+	for (char *s = ___get_tok(str, sep, &next); s; s = ___get_tok(NULL, sep, &next))
 		printf("sub=%s\n", s);
 	println();
 }
