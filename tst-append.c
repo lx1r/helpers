@@ -23,13 +23,13 @@ int main()
 	println("ret=", ret);
 
 	print("len=", len(nums), ": ");
-	printv(nums);
+	printv(",", nums);
 	println();
 
-	char *str = joinv(nums);
+	char *str = joinv(",", nums);
 	println("str=", str);
-	println("str=", joinv(nums, len(nums) - 1));
-	println("str=", joinv(nums, len(nums) - 2, "--"));
+	println("str=", joinv(",", nums, len(nums) - 1));
+	println("str=", joinv("--", nums, len(nums) - 2));
 
 	struct unit *units = NULL;
 	append(&units, {0});

@@ -202,7 +202,7 @@ static inline bool used(void *ptr, ssize_t slot)
 #define reserve0(pptr) reserve1(pptr, 32)
 
 /**
- * @fn type *reserve(type **pptr, size len, bool map=false)
+ * @fn type *reserve(type **pptr, size len, bool map = false)
  *
  * @brief Pre-allocates memory for an array.
  *
@@ -535,41 +535,41 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
-#define ___printv(fp, tokens, nr_tokens, delim) ({\
+#define ___printv(fp, sep, tokens, nr_tokens) ({\
 	int nb_ = 0;\
 	size_t len_ = (nr_tokens);\
-	const char *delim_ = "";\
+	const char *sep_ = "";\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
 	typeof(tokens) *tokens_ptr_ = &(tokens);\
-	___fill_pr_fmt(dst_, delim_);\
+	___fill_pr_fmt(dst_, sep_);\
 	___fill_pr_fmt(dst_, **tokens_ptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += fprintf(fp, fmt_, delim_, (*tokens_ptr_)[i_]);\
-		if (i_ == 0) delim_ = (delim);\
+		nb_ += fprintf(fp, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) sep_ = (sep);\
 	}\
 	nb_;\
 })
 
-#define fprintv2(fp, tokens, nr_tokens, delim) ___printv(fp, tokens, nr_tokens, delim)
-#define fprintv1(fp, tokens, nr_tokens) fprintv2(fp, tokens, nr_tokens, ",")
-#define fprintv0(fp, tokens) fprintv1(fp, tokens, len(tokens))
-#define fprintv(fp, tokens, ...)\
-	___apply(fprintv, ___narg(__VA_ARGS__))(fp, tokens, ##__VA_ARGS__)
+#define fprintv1(fp, sep, tokens, nr_tokens) ___printv(fp, sep, tokens, nr_tokens)
+#define fprintv0(fp, sep, tokens) fprintv1(fp, sep, tokens, len(tokens))
+
+#define fprintv(fp, sep, tokens, ...)\
+	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, tokens, ##__VA_ARGS__)
 
 /**
- * @fn int printv(type *tokens, size_t nr_tokens, const char *delim)
+ * @fn int printv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))
  *
  * @brief Print an array to the standard output stream.
  *
+ * @param sep separator between elements of the output array
  * @param tokens array of values or constants of standard type to print
- * @param nr_tokens number of tokens to output (default is len())
- * @param delim delimiter output between the tokens (default is a space)
+ * @param nr_tokens number of tokens to output (default is `len()`)
  *
  * @return The number of bytes printed.
  */
-#define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
+#define printv(sep, tokens, ...) fprintv(stdout, sep, tokens, ##__VA_ARGS__)
 
 /**
  * @fn char *join(...)
@@ -591,70 +591,69 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	buf_;\
 })
 
-#define ___joinv(tokens, nr_tokens, delim) ({\
+#define ___joinv(sep, tokens, nr_tokens) ({\
 	int nb_ = 0;\
 	size_t len_ = (nr_tokens);\
-	const char *delim_ = "";\
+	const char *sep_ = "";\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
 	typeof(tokens) *tokens_ptr_ = &(tokens);\
-	___fill_pr_fmt(dst_, delim_);\
+	___fill_pr_fmt(dst_, sep_);\
 	___fill_pr_fmt(dst_, **tokens_ptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += snprintf(NULL, 0, fmt_, delim_, (*tokens_ptr_)[i_]);\
-		if (i_ == 0) delim_ = (delim);\
+		nb_ += snprintf(NULL, 0, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) sep_ = (sep);\
 	}\
 	char *buf_ = malloc(nb_ + 1);\
 	nb_ = 0;\
-	delim_ = "";\
+	sep_ = "";\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += sprintf(buf_ + nb_, fmt_, delim_, (*tokens_ptr_)[i_]);\
-		if (i_ == 0) delim_ = (delim);\
+		nb_ += sprintf(buf_ + nb_, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		if (i_ == 0) sep_ = (sep);\
 	}\
 	buf_;\
 })
 
-#define joinv2(tokens, nr_tokens, delim) ___joinv(tokens, nr_tokens, delim)
-#define joinv1(tokens, nr_tokens) joinv2(tokens, nr_tokens, ",")
-#define joinv0(tokens) joinv1(tokens, len(tokens))
+#define joinv1(sep, tokens, nr_tokens) ___joinv(sep, tokens, nr_tokens)
+#define joinv0(sep, tokens) joinv1(sep, tokens, len(tokens))
 
 /**
- * @fn char *joinv(type *tokens, size_t nr_tokens, const char *delim)
+ * @fn char *joinv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))
  *
  * @brief Concatenates an array into a single string.
  *
+ * @param sep substring between the joined elements
  * @param tokens array of values or constants of standard type to join
- * @param nr_tokens number of elements to join (default is len(tokens))
- * @param delim substring between the joined elements (default is a space)
+ * @param nr_tokens number of elements to join (default is `len(tokens)`)
  *
  * @return The pointer to joined string, should be released by calling `free()`.
  */
-#define joinv(tokens, ...)\
-	___apply(joinv, ___narg(__VA_ARGS__))(tokens, ##__VA_ARGS__)
+#define joinv(sep, tokens, ...)\
+	___apply(joinv, ___narg(__VA_ARGS__))(sep, tokens, ##__VA_ARGS__)
 
-static inline char *___subtok(const char *str, const char *delim, const char **next)
+static inline char *___subtok(const char *str, const char *sep, const char **next)
 {
-	size_t token_len;
-	size_t delim_len = strlen(delim);
+	size_t tok_len;
+	size_t sep_len = strlen(sep);
 
 	if (!str)
 		str = *next;
 	if (!str)
 		return NULL;
 
-	char *found_delim = strstr(str, delim);
-	if (found_delim) {
-		token_len = found_delim - str;
-		*next = found_delim + delim_len;
+	char *found_sep = strstr(str, sep);
+	if (found_sep) {
+		tok_len = found_sep - str;
+		*next = found_sep + sep_len;
 	} else {
-		token_len = strlen(str);
+		tok_len = strlen(str);
 		*next = NULL;
 	}
-	char *token = malloc(token_len + 1);
-	memcpy(token, str, token_len);
-	token[token_len] = '\0';
-	return token;
+	char *tok = malloc(tok_len + 1);
+	memcpy(tok, str, tok_len);
+	tok[tok_len] = '\0';
+	return tok;
 }
 
 #define ___strto(x, s) ({\
@@ -679,33 +678,33 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 		 char *:                strdup(str_)) : 0;\
 })
 
-#define ___splitn(str, delim, p) ({\
-	char *tok_ = ___subtok(NULL, delim, &next_);\
+#define ___splitn(str, sep, p) ({\
+	char *tok_ = ___subtok(NULL, sep, &next_);\
 	*(p) = ___strto(*(p), tok_);\
 	free(tok_);\
 })
 
-#define ___split1(str, delim)
-#define ___split2(str, delim, p) ___splitn(str, delim, p)
-#define ___split3(str, delim, p, ...) ___splitn(str, delim, p); ___split2(str, delim, __VA_ARGS__)
-#define ___split4(str, delim, p, ...) ___splitn(str, delim, p); ___split3(str, delim, __VA_ARGS__)
-#define ___split5(str, delim, p, ...) ___splitn(str, delim, p); ___split4(str, delim, __VA_ARGS__)
-#define ___split6(str, delim, p, ...) ___splitn(str, delim, p); ___split5(str, delim, __VA_ARGS__)
-#define ___split7(str, delim, p, ...) ___splitn(str, delim, p); ___split6(str, delim, __VA_ARGS__)
-#define ___split8(str, delim, p, ...) ___splitn(str, delim, p); ___split7(str, delim, __VA_ARGS__)
-#define ___split9(str, delim, p, ...) ___splitn(str, delim, p); ___split8(str, delim, __VA_ARGS__)
-#define ___split10(str, delim, p, ...) ___splitn(str, delim, p); ___split9(str, delim, __VA_ARGS__)
-#define ___split11(str, delim, p, ...) ___splitn(str, delim, p); ___split10(str, delim, __VA_ARGS__)
-#define ___split12(str, delim, p, ...) ___splitn(str, delim, p); ___split11(str, delim, __VA_ARGS__)
+#define ___split1(str, sep)
+#define ___split2(str, sep, p) ___splitn(str, sep, p)
+#define ___split3(str, sep, p, ...) ___splitn(str, sep, p); ___split2(str, sep, __VA_ARGS__)
+#define ___split4(str, sep, p, ...) ___splitn(str, sep, p); ___split3(str, sep, __VA_ARGS__)
+#define ___split5(str, sep, p, ...) ___splitn(str, sep, p); ___split4(str, sep, __VA_ARGS__)
+#define ___split6(str, sep, p, ...) ___splitn(str, sep, p); ___split5(str, sep, __VA_ARGS__)
+#define ___split7(str, sep, p, ...) ___splitn(str, sep, p); ___split6(str, sep, __VA_ARGS__)
+#define ___split8(str, sep, p, ...) ___splitn(str, sep, p); ___split7(str, sep, __VA_ARGS__)
+#define ___split9(str, sep, p, ...) ___splitn(str, sep, p); ___split8(str, sep, __VA_ARGS__)
+#define ___split10(str, sep, p, ...) ___splitn(str, sep, p); ___split9(str, sep, __VA_ARGS__)
+#define ___split11(str, sep, p, ...) ___splitn(str, sep, p); ___split10(str, sep, __VA_ARGS__)
+#define ___split12(str, sep, p, ...) ___splitn(str, sep, p); ___split11(str, sep, __VA_ARGS__)
 
 /**
- * @fn void split(const char *str, const char *delim, ...)
+ * @fn void split(const char *str, const char *sep, ...)
  *
  * @brief Splits a string into tokens and assigns the token values
  * to the specified list of variables.
  *
  * @param str the string to be parsed
- * @param delim substring delimits the tokens in the parsed string
+ * @param sep substring delimits the tokens in the parsed string
  * @param ... list of pointers to variables to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
@@ -713,29 +712,29 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
  * allocated to store the token. Such memory should be released by
  * calling `free()`.
  */
-#define split(str, delim, p, ...) ({\
+#define split(str, sep, p, ...) ({\
 	const char *next_ = NULL;\
-	char *tok_ = ___subtok(str, delim, &next_);\
+	char *tok_ = ___subtok(str, sep, &next_);\
 	*(p) = ___strto(*(p), tok_);\
 	free(tok_);\
-	___apply(___split, ___narg(p, ##__VA_ARGS__))(str, delim, ##__VA_ARGS__);\
+	___apply(___split, ___narg(p, ##__VA_ARGS__))(str, sep, ##__VA_ARGS__);\
 })
 
 /**
- * @fn void splitv(const char *str, const char *delim, type **pptr)
+ * @fn void splitv(const char *str, const char *sep, type **pptr)
  *
  * @brief Splits a string into tokens and adds the token values
  * to a dynamic array.
  *
  * @param str string to be parsed
- * @param delim substring separates tokens in the parsed string
+ * @param sep substring separates tokens in the parsed string
  * @param pptr pointer to a list to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
  */
-#define splitv(str, delim, pptr) ({\
+#define splitv(str, sep, pptr) ({\
 	const char *next_ = NULL;\
-	for (char *tok_ = ___subtok(str, delim, &next_); tok_; tok_ = ___subtok(NULL, delim, &next_)) {\
+	for (char *tok_ = ___subtok(str, sep, &next_); tok_; tok_ = ___subtok(NULL, sep, &next_)) {\
 		append(pptr, ___strto(**(pptr), tok_));\
 		free(tok_);\
 	}\

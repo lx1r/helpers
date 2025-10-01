@@ -9,7 +9,7 @@ Returns the number of elements in a dynamic or an associative array.
 
 ---
 
-`type *reserve(type **pptr, size len, bool map=false)`
+`type *reserve(type **pptr, size len, bool map = false)`
 
 Pre-allocates memory for an array.
 
@@ -117,13 +117,13 @@ Prints a line to the standard output stream.
 
 ---
 
-`int printv(type *tokens, size_t nr_tokens, const char *delim)`
+`int printv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))`
 
 Print an array to the standard output stream.
 
+* `sep` -  separator between elements of the output array
 * `tokens` -  array of values or constants of standard type to print
-* `nr_tokens` -  number of tokens to output (default is len())
-* `delim` -  delimiter output between the tokens (default is a space)
+* `nr_tokens` -  number of tokens to output (default is `len()`)
 
 **Returns:** The number of bytes printed.
 
@@ -139,25 +139,25 @@ Concatenates an list of values into a single string.
 
 ---
 
-`char *joinv(type *tokens, size_t nr_tokens, const char *delim)`
+`char *joinv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))`
 
 Concatenates an array into a single string.
 
+* `sep` -  substring between the joined elements
 * `tokens` -  array of values or constants of standard type to join
-* `nr_tokens` -  number of elements to join (default is len(tokens))
-* `delim` -  substring between the joined elements (default is a space)
+* `nr_tokens` -  number of elements to join (default is `len(tokens)`)
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
 
 ---
 
-`void split(const char *str, const char *delim, ...)`
+`void split(const char *str, const char *sep, ...)`
 
 Splits a string into tokens and assigns the token values
 to the specified list of variables.
 
 * `str` -  the string to be parsed
-* `delim` -  substring delimits the tokens in the parsed string
+* `sep` -  substring delimits the tokens in the parsed string
 * `` - ... list of pointers to variables to assign token values to
 
 Tokens will be converted to the target type before assignment.
@@ -167,13 +167,13 @@ calling `free()`.
 
 ---
 
-`void splitv(const char *str, const char *delim, type **pptr)`
+`void splitv(const char *str, const char *sep, type **pptr)`
 
 Splits a string into tokens and adds the token values
 to a dynamic array.
 
 * `str` -  string to be parsed
-* `delim` -  substring separates tokens in the parsed string
+* `sep` -  substring separates tokens in the parsed string
 * `pptr` -  pointer to a list to assign token values to
 
 Tokens will be converted to the target type before assignment.

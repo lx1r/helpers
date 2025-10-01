@@ -1,30 +1,30 @@
 #include "helpers.h"
 
-void test_vstr(char *str, char *delim)
+void test_vstr(char *str, char *sep)
 {
 	char **tokens = NULL;
 
-	splitv(str, delim, &tokens);
+	splitv(str, sep, &tokens);
 	for (int i = 0; i < len(tokens); i++)
 		println("tokens[", i, "]=", tokens[i]);
-	char *res = joinv(tokens, len(tokens), ":_-_:");
-	println("delim=", delim);
+	char *res = joinv(":_-_:", tokens);
+	println("delim=", sep);
 	println("str=", str);
 	println("res=", res);
 
 	const char *next;
-	for (char *s = ___subtok(str, delim, &next); s; s = ___subtok(NULL, delim, &next))
+	for (char *s = ___subtok(str, sep, &next); s; s = ___subtok(NULL, sep, &next))
 		printf("sub=%s\n", s);
 	println();
 }
 
-void test_split3(char *str, char *delim)
+void test_split3(char *str, char *sep)
 {
 	char *dir[3];
 
-	println("delim=", delim);
+	println("delim=", sep);
 	println("str=", str);
-	split(str, delim, &dir[0], &dir[1], &dir[2]);
+	split(str, sep, &dir[0], &dir[1], &dir[2]);
 
 	for (int i = 0; i < static_len(dir); i++)
 		println("dir", i, "=", dir[i]);
@@ -33,17 +33,17 @@ void test_split3(char *str, char *delim)
 
 int main()
 {
-	char *delim;
+	char *sep;
 
-	delim = "$token-comma$";
-	test_vstr("first$token-comma$middle$token-comma$last", delim);
-	test_vstr("$token-comma$middle$token-comma$last", delim);
-	test_vstr("first$token-comma$middle$token-comma$", delim);
-	test_vstr("$token-comma$middle$token-comma$", delim);
-	test_vstr("$token-comma$$token-comma$middle$token-comma$$token-comma$", delim);
-	test_vstr("$token-comma$$token-comma$middle1$token-comma$$token-comma$middle2$token-comma$$token-comma$", delim);
-	test_vstr("$notokens$", delim);
-	test_vstr("", delim);
+	sep = "$token-comma$";
+	test_vstr("first$token-comma$middle$token-comma$last", sep);
+	test_vstr("$token-comma$middle$token-comma$last", sep);
+	test_vstr("first$token-comma$middle$token-comma$", sep);
+	test_vstr("$token-comma$middle$token-comma$", sep);
+	test_vstr("$token-comma$$token-comma$middle$token-comma$$token-comma$", sep);
+	test_vstr("$token-comma$$token-comma$middle1$token-comma$$token-comma$middle2$token-comma$$token-comma$", sep);
+	test_vstr("$notokens$", sep);
+	test_vstr("", sep);
 
 	test_split3("dir1/dir2/dir3", "/");
 	test_split3("di/r1/_/di/r2/_/di/r3", "/_/");
