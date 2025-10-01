@@ -81,7 +81,7 @@ static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
-#define __defer(func) __attribute__((__cleanup__(___p##func)))
+#define defer(func) __attribute__((__cleanup__(___p##func)))
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
