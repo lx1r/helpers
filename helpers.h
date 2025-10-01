@@ -202,7 +202,7 @@ static inline bool used(void *ptr, ssize_t slot)
 #define reserve0(pptr) reserve1(pptr, 32)
 
 /**
- * @fn type *reserve(type **pptr, size len, bool map)
+ * @fn type *reserve(type **pptr, size len, bool map=false)
  *
  * @brief Pre-allocates memory for an array.
  *
@@ -243,8 +243,8 @@ static inline size_t ___align_sz(size_t nb)
  * @param init initializer for a new array element, may be an aggregate
  * initializer list
  *
- * @return Index in the array where the new value is appended or
- * -1 something went wrong, the index is valid until any method on the
+ * @return Index in the array where the new value is appended or `-1`
+ * if something went wrong, the index is valid until any method on the
  * dynamic array is called.
  */
 #define append(pptr, ...) ({\
