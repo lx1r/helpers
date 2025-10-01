@@ -1,26 +1,25 @@
 #!/bin/make -f
 
-.PHONY: all test clean
+.PHONY: all clean
 
 CFLAGS=-I.. -Wall -Wfatal-errors
 sources = $(wildcard *.c)
 headers = $(wildcard *.h)
 tests = $(sources:.c=)
 
-all: $(tests) README.md
+all: README.md $(tests)
 
 %: %.c $(headers)
-
 	@gcc $(CFLAGS) $< -o $@
 	@echo -n running $@...
 	-@./$@ > $@.log
 	-@diff $@.log $@.cmp > /dev/null && echo ok
 
 clean:
-
 	$(RM) *.o *.log $(tests)
 
-README.md:
+README.md: helpers.h
+	@echo gen $@
 	@cat helpers.h | grep "^ \*" | \
 	sed -r \
 	-e "s/.*(@fn )(.*)/\n\`\2\`/" \

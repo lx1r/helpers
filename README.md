@@ -9,7 +9,7 @@ Returns the number of elements in a dynamic or an associative array.
 
 ---
 
-`type *reserve(type **pptr, size len, bool map)`
+`type *reserve(type **pptr, size len, bool map=false)`
 
 Pre-allocates memory for an array.
 
@@ -31,8 +31,8 @@ usage if necessary.
 * `init` -  initializer for a new array element, may be an aggregate
 initializer list
 
-**Returns:** Index in the array where the new value is appended or
--1 something went wrong, the index is valid until any method on the
+**Returns:** Index in the array where the new value is appended or `-1`
+if something went wrong, the index is valid until any method on the
 dynamic array is called.
 
 ---
