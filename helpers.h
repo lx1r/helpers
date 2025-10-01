@@ -376,7 +376,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @def mapof(key_type, val_type)
+ * @fn mapof(key_type, val_type)
  *
  * @brief Associative array element type.
  *
@@ -569,50 +569,6 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define printv(tokens, ...) fprintv(stdout, tokens, ##__VA_ARGS__)
 
-static inline void ___fprint_bits(FILE *fp, unsigned long start, unsigned long end,
-				  const char **period_ptr, const char *comma, const char *dash)
-{
-	if (start == -1)
-		return;
-
-	unsigned long diff = end - start;
-
-	if (diff == 0)
-		fprintf(fp, "%s%ld", *period_ptr, start);
-	else if (diff == 1)
-		fprintf(fp, "%s%ld%s%ld", *period_ptr, start, comma, end);
-	else
-		fprintf(fp, "%s%ld%s%ld", *period_ptr, start, dash, end);
-
-	*period_ptr = comma;
-}
-
-static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long nr_bits,
-				  const char *comma, const char *dash)
-{
-	const char *period = "";
-	unsigned long start = -1, end;
-
-	for (unsigned long i = 0; i < nr_bits; i++) {
-		if (test_bit(i, bits)) {
-			if (start == -1)
-				start = i;
-			end = i;
-		} else {
-			___fprint_bits(fp, start, end, &period, comma, dash);
-			start = -1;
-		}
-	}
-	___fprint_bits(fp, start, end, &period, comma, dash);
-}
-
-#define fprintb1(fp, bits, nr_bits, comma) ___fprint_mask(fp, bits, nr_bits, comma, "-")
-#define fprintb0(fp, bits, nr_bits) fprintb1(fp, bits, nr_bits, ",")
-#define fprintb(fp, bits, nr_bits, ...)\
-	___apply(fprintb, ___narg(__VA_ARGS__))(fp, bits, nr_bits, ##__VA_ARGS__)
-
-#define printb(bits, nr_bits, ...) fprintb(stdout, bits, nr_bits, ##__VA_ARGS__)
-
 /**
  * @fn char *join(...)
  *
@@ -677,7 +633,7 @@ static inline void ___fprint_mask(FILE *fp, unsigned long *bits, unsigned long n
 
 static inline char *___subtok(const char *str, const char *delim, const char **next)
 {
-	size_t tok_len;
+	size_t token_len;
 	size_t delim_len = strlen(delim);
 
 	if (!str)
@@ -687,16 +643,16 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 
 	char *found_delim = strstr(str, delim);
 	if (found_delim) {
-		tok_len = found_delim - str;
+		token_len = found_delim - str;
 		*next = found_delim + delim_len;
 	} else {
-		tok_len = strlen(str);
+		token_len = strlen(str);
 		*next = NULL;
 	}
-	char *tok = malloc(tok_len + 1);
-	memcpy(tok, str, tok_len);
-	tok[tok_len] = '\0';
-	return tok;
+	char *token = malloc(token_len + 1);
+	memcpy(token, str, token_len);
+	token[token_len] = '\0';
+	return token;
 }
 
 #define ___strto(x, s) ({\
@@ -764,88 +720,24 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
 })
 
 /**
- * @fn void splitv(type **pptr, const char *str, const char *delim)
+ * @fn void splitv(const char *str, const char *delim, type **pptr)
  *
  * @brief Splits a string into tokens and adds the token values
  * to a dynamic array.
  *
- * @param pptr pointer to a list to assign token values to
  * @param str string to be parsed
  * @param delim substring separates tokens in the parsed string
+ * @param pptr pointer to a list to assign token values to 
  *
  * Tokens will be converted to the target type before assignment.
  */
-#define ___splitv(pptr, str, delim) ({\
+#define splitv(str, delim, pptr) ({\
 	const char *next_ = NULL;\
 	for (char *tok_ = ___subtok(str, delim, &next_); tok_; tok_ = ___subtok(NULL, delim, &next_)) {\
 		append(pptr, ___strto(**(pptr), tok_));\
 		free(tok_);\
 	}\
 })
-
-#define splitv1(pptr, str, delim) ___splitv(pptr, str, delim)
-#define splitv0(pptr, str) splitv1(pptr, str, ",")
-#define splitv(pptr, str, ...)\
-	___apply(splitv, ___narg(__VA_ARGS__))(pptr, str, ##__VA_ARGS__)
-
-static inline int ___splitv_mask(unsigned long *bits, unsigned long nr_bits,
-				 const char *str, const char **tokens, const char *delim)
-{
-	char __defer(free) *dup = strdup(str);
-	if (!dup)
-		return -1;
-
-	for (char *tok = strtok(dup, delim); tok; tok = strtok(NULL, delim)) {
-		for (int i = 0; i < nr_bits; i++)
-			if (strcmp(tok, tokens[i]) == 0)
-				set_bit(i, bits);
-	}
-	return 0;
-}
-
-#define splitvb1(bits, nr_bits, str, tokens, delim) ___splitv_mask(bits, nr_bits, str, tokens, delim)
-#define splitvb0(bits, nr_bits, str, tokens) splitvb1(bits, nr_bits, str, tokens, ",")
-#define splitvb(bits, nr_bits, str, tokens, ...)\
-	___apply(splitvb, ___narg(__VA_ARGS__))(bits, nr_bits, str, tokens, ##__VA_ARGS__)
-
-static inline int ___split_mask(unsigned long *bits, unsigned long nr_bits,
-				const char *str, const char *comma, const char *dash)
-{
-	char __defer(free) *dup = strdup(str);
-	if (!dup)
-		return -1;
-
-	char *comma_ptr;
-	for (char *tok = strtok_r(dup, comma, &comma_ptr); tok;
-	     tok = strtok_r(NULL, comma, &comma_ptr)) {
-
-		char *dash_ptr;
-		char *start_str = strtok_r(tok, dash, &dash_ptr);
-		char *end_str = strtok_r(NULL, dash, &dash_ptr);
-
-		if (start_str) {
-			unsigned long end, start;
-
-			start = atol(start_str);
-			if (end_str)
-				end = atol(end_str);
-			else
-				end = start;
-			if (!(start < nr_bits && end < nr_bits))
-				continue;
-			for (unsigned long i = start; i <= end; i++)
-				set_bit(i, bits);
-		}
-	}
-	return 0;
-}
-
-#define splitb2(bits, nr_bits, str, comma, dash) ___split_mask(bits, nr_bits, str, comma, dash)
-#define splitb1(bits, nr_bits, str, comma) splitb2(bits, nr_bits, str, comma, "-")
-#define splitb0(bits, nr_bits, str) splitb1(bits, nr_bits, str, ",")
-#define splitb(bits, nr_bits, str, ...)\
-	___apply(splitb, ___narg(__VA_ARGS__))(bits, nr_bits, str, ##__VA_ARGS__)
-
 
 #define ___decl1(x) x;
 #define ___decl2(x, ...) x; ___decl1(__VA_ARGS__)
