@@ -8,7 +8,7 @@ void test_vstr(char *str, char *sep)
 	for (int i = 0; i < len(tokens); i++)
 		println("tokens[", i, "]=", tokens[i]);
 	char *res = joinv(":_-_:", tokens);
-	println("delim=", sep);
+	println("sep=", sep);
 	println("str=", str);
 	println("res=", res);
 
@@ -22,7 +22,7 @@ void test_split3(char *str, char *sep)
 {
 	char *dir[3];
 
-	println("delim=", sep);
+	println("sep=", sep);
 	println("str=", str);
 	split(str, sep, &dir[0], &dir[1], &dir[2]);
 
