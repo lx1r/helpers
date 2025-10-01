@@ -7,13 +7,6 @@ struct unit {
 	int data3;
 };
 
-void print_mask(unsigned long mask)
-{
-	print("maskof: ", (void *)mask, ": ");
-	printb(&mask, 32);
-	println();
-}
-
 int main()
 {
 	unsigned long *nums = NULL;
@@ -37,12 +30,6 @@ int main()
 	println("str=", str);
 	println("str=", joinv(nums, len(nums) - 1));
 	println("str=", joinv(nums, len(nums) - 2, "--"));
-
-	printb(nums, len(nums)*BITS_PER_LONG);
-	println();
-	print_mask(-1);
-	print_mask(0xf0f0);
-	print_mask(0x0f0f);
 
 	struct unit *units = NULL;
 	append(&units, {0});

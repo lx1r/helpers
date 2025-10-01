@@ -124,6 +124,8 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
+/* Iterate over an array */
+
 #define ___foreach0(ref, ptr) ___foreach1(ref, ptr, len(ptr))
 #define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
@@ -727,7 +729,7 @@ static inline char *___subtok(const char *str, const char *delim, const char **n
  *
  * @param str string to be parsed
  * @param delim substring separates tokens in the parsed string
- * @param pptr pointer to a list to assign token values to 
+ * @param pptr pointer to a list to assign token values to
  *
  * Tokens will be converted to the target type before assignment.
  */

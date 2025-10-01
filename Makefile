@@ -7,7 +7,7 @@ sources = $(wildcard *.c)
 headers = $(wildcard *.h)
 tests = $(sources:.c=)
 
-test: $(tests)
+all: $(tests) README.md
 
 %: %.c $(headers)
 
@@ -19,3 +19,14 @@ test: $(tests)
 clean:
 
 	$(RM) *.o *.log $(tests)
+
+README.md:
+	@cat helpers.h | grep "^ \*" | \
+	sed -r \
+	-e "s/.*(@fn )(.*)/\n\`\2\`/" \
+	-e "s/.*(@brief )(.*)/\2/" \
+	-e "s/.*(@param )([a-z0-9_]*)(.*)/* \`\2\` - \3/" \
+	-e "s/.*(@return )(.*)/\*\*Returns:\*\* \2/" \
+	-e "s/^ \* (.*)/\1/" \
+	-e "s/^ \*\//\n---/" \
+	-e "s/^ \*(.*)//" > $@

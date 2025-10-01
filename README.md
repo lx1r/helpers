@@ -167,14 +167,14 @@ calling `free()`.
 
 ---
 
-`void splitv(type **pptr, const char *str, const char *delim)`
+`void splitv(const char *str, const char *delim, type **pptr)`
 
 Splits a string into tokens and adds the token values
 to a dynamic array.
 
-* `pptr` -  pointer to a list to assign token values to
 * `str` -  string to be parsed
 * `delim` -  substring separates tokens in the parsed string
+* `pptr` -  pointer to a list to assign token values to
 
 Tokens will be converted to the target type before assignment.
 

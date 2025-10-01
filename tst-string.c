@@ -4,7 +4,7 @@ void test_vstr(char *str, char *delim)
 {
 	char **tokens = NULL;
 
-	splitv(&tokens, str, delim);
+	splitv(str, delim, &tokens);
 	for (int i = 0; i < len(tokens); i++)
 		println("tokens[", i, "]=", tokens[i]);
 	char *res = joinv(tokens, len(tokens), ":_-_:");
