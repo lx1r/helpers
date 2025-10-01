@@ -6,6 +6,7 @@ Returns the number of elements in a dynamic or an associative array.
 * `ptr` -  pointer to the dynamic or associative array
 
 **Returns:** Number of elements in the array.
+
 ---
 
 `type *reserve(type **pptr, size len, bool map)`
@@ -18,6 +19,7 @@ may be any type
 * `map` -  if true preallocate memory for an associative array
 
 **Returns:** Pointer to the pre-allocated array.
+
 ---
 
 `ssize_t append(type **pptr, type init)`
@@ -32,6 +34,7 @@ initializer list
 **Returns:** Index in the array where the new value is appended or
 -1 something went wrong, the index is valid until any method on the
 dynamic array is called.
+
 ---
 
 `mapof(key_type, val_type)`
@@ -44,6 +47,7 @@ type except a pointer to a null terminated string
 
 To pass associative array pointers to functions, the associative array type
 must be fully qualified using the `typedef` keyword.
+
 ---
 
 `ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)`
@@ -63,6 +67,7 @@ initializer list
 **Returns:** Index in the array where the new value is inserted or
 -1 something went wrong, the index is valid until any method on the
 associative array is called.
+
 ---
 
 `ssize_t delete(mapof(key_type, val_type) **pptr, val_type *val_ref)`
@@ -75,6 +80,7 @@ in the array, can be returned by `lookup()` method
 
 **Returns:** Index in the array that `val_ref` belonged to,
 the index is valid until any associative array method is called.
+
 ---
 
 `val_type *lookup(mapof(key_type, val_type) **pptr, key_type key)`
@@ -87,6 +93,7 @@ Searches a data associated with a key.
 **Returns:** Reference to the data that the `key` is associated with,
 the reference is valid until any associative array method is called,
 if the key doesn't exist NULL pointer will be returned.
+
 ---
 
 `int fprintln(FILE *fp, ...)`
@@ -97,6 +104,7 @@ Prints a line to a stream.
 * `` - ... list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
+
 ---
 
 `int println(...)`
@@ -106,6 +114,7 @@ Prints a line to the standard output stream.
 * `` - ... list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
+
 ---
 
 `int printv(type *tokens, size_t nr_tokens, const char *delim)`
@@ -117,6 +126,7 @@ Print an array to the standard output stream.
 * `delim` -  delimiter output between the tokens (default is a space)
 
 **Returns:** The number of bytes printed.
+
 ---
 
 `char *join(...)`
@@ -126,6 +136,7 @@ Concatenates an list of values into a single string.
 * `` - ... list of values or constants of standard type to join
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
+
 ---
 
 `char *joinv(type *tokens, size_t nr_tokens, const char *delim)`
@@ -137,6 +148,7 @@ Concatenates an array into a single string.
 * `delim` -  substring between the joined elements (default is a space)
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
+
 ---
 
 `void split(const char *str, const char *delim, ...)`
@@ -152,6 +164,7 @@ Tokens will be converted to the target type before assignment.
 For pointers to a string, the necessary amount of memory will be
 allocated to store the token. Such memory should be released by
 calling `free()`.
+
 ---
 
 `void splitv(type **pptr, const char *str, const char *delim)`
@@ -164,4 +177,5 @@ to a dynamic array.
 * `delim` -  substring separates tokens in the parsed string
 
 Tokens will be converted to the target type before assignment.
+
 ---
