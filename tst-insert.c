@@ -54,10 +54,10 @@ void walk()
 
 int main()
 {
-	println("ALIGN(1)=", ALIGN(1, sizeof(unsigned long)));
-	println("ALIGN_DOWN(1)=", ALIGN_DOWN(1, sizeof(unsigned long)));
-	println("ALIGN_DOWN(", sizeof(unsigned long), ")=", ALIGN_DOWN(sizeof(unsigned long), sizeof(unsigned long)));
-	println("ALIGN_DOWN(40)=", ALIGN_DOWN(40, sizeof(unsigned long)));
+	println("ALIGN(1)=", ___align(1, sizeof(unsigned long)));
+	println("ALIGN_DOWN(1)=", ___align_down(1, sizeof(unsigned long)));
+	println("ALIGN_DOWN(", sizeof(unsigned long), ")=", ___align_down(sizeof(unsigned long), sizeof(unsigned long)));
+	println("ALIGN_DOWN(40)=", ___align_down(40, sizeof(unsigned long)));
 
 	find(7);
 

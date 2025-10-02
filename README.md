@@ -1,5 +1,5 @@
 
-`size_t len(void *ptr)`
+`size_t len(void *ptr);`
 
 Returns the number of elements in a dynamic or an associative array.
 
@@ -9,7 +9,18 @@ Returns the number of elements in a dynamic or an associative array.
 
 ---
 
-`type *reserve(type **pptr, size len, bool map = false)`
+`foreach(type *ref, type *ptr, size_t len = len(ptr))`
+
+Iterate over an array.
+
+* `ref` -  array iterator, not necessary to declare before
+* `ptr` -  pointer to an array
+* `len` -  number of elements to iterate (default is `len(ptr)`)
+
+
+---
+
+`type *reserve(type **pptr, size len, bool map = false);`
 
 Pre-allocates memory for an array.
 
@@ -22,7 +33,7 @@ may be any type
 
 ---
 
-`ssize_t append(type **pptr, type init)`
+`ssize_t append(type **pptr, type init);`
 
 Adds an element to the end of a dynamic array, expands memory
 usage if necessary.
@@ -37,20 +48,20 @@ dynamic array is called.
 
 ---
 
-`mapof(key_type, val_type)`
+`mapof(ktype, vtype)`
 
 Associative array element type.
 
-* `key_type` -  associative array index (key) type, can be any non-pointer
+* `ktype` -  associative array index (key) type, can be any non-pointer
 type except a pointer to a null terminated string
-* `val_type` -  a type of value associated with the key, can be any type
+* `vtype` -  a type of value associated with the key, can be any type
 
 To pass associative array pointers to functions, the associative array type
 must be fully qualified using the `typedef` keyword.
 
 ---
 
-`ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)`
+`ssize_t insert(mapof(ktype, vtype) **pptr, ktype key, vtype value);`
 
 Adds an element to a dynamic associative array, expands memory
 usage if necessary.
@@ -64,26 +75,26 @@ added, to prevent this, the `lookup` method should be used.
 * `init` -  initializer for a new data element, may be an aggregate
 initializer list
 
-**Returns:** Index in the array where the new value is inserted or
--1 something went wrong, the index is valid until any method on the
+**Returns:** Index in the array where the new value is inserted or `-1`
+if something went wrong, the index is valid until any method on the
 associative array is called.
 
 ---
 
-`ssize_t delete(mapof(key_type, val_type) **pptr, val_type *val_ref)`
+`ssize_t delete(mapof(ktype, vtype) **pptr, vtype *ref);`
 
 Removes an element from an associative array.
 
 * `pptr` -  pointer to the associative array
-* `val_ref` -  reference to a data value associated with a key
+* `ref` -  reference to a data value associated with a key
 in the array, can be returned by `lookup()` method
 
-**Returns:** Index in the array that `val_ref` belonged to,
+**Returns:** Index in the array that `ref` belonged to,
 the index is valid until any associative array method is called.
 
 ---
 
-`val_type *lookup(mapof(key_type, val_type) **pptr, key_type key)`
+`vtype *lookup(mapof(ktype, vtype) **pptr, ktype key);`
 
 Searches a data associated with a key.
 
@@ -96,7 +107,7 @@ if the key doesn't exist NULL pointer will be returned.
 
 ---
 
-`int fprintln(FILE *fp, ...)`
+`int fprintln(FILE *fp, ...);`
 
 Prints a line to a stream.
 
@@ -107,7 +118,7 @@ Prints a line to a stream.
 
 ---
 
-`int println(...)`
+`int println(...);`
 
 Prints a line to the standard output stream.
 
@@ -117,19 +128,19 @@ Prints a line to the standard output stream.
 
 ---
 
-`int printv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))`
+`int printv(const char *sep, type *ptr, size_t len = len(ptr));`
 
 Print an array to the standard output stream.
 
 * `sep` -  separator between elements of the output array
-* `tokens` -  array of values or constants of standard type to print
-* `nr_tokens` -  number of tokens to output (default is `len()`)
+* `ptr` -  array of values or constants of standard type to print
+* `len` -  number of elements to output (default is `len()`)
 
 **Returns:** The number of bytes printed.
 
 ---
 
-`char *join(...)`
+`char *join(...);`
 
 Concatenates an list of values into a single string.
 
@@ -139,19 +150,19 @@ Concatenates an list of values into a single string.
 
 ---
 
-`char *joinv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))`
+`char *joinv(const char *sep, type *ptr, size_t len = len(ptr));`
 
 Concatenates an array into a single string.
 
 * `sep` -  substring between the joined elements
-* `tokens` -  array of values or constants of standard type to join
-* `nr_tokens` -  number of elements to join (default is `len(tokens)`)
+* `ptr` -  array of values or constants of standard type to join
+* `len` -  number of elements to join (default is `len(ptr)`)
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
 
 ---
 
-`void split(const char *str, const char *sep, ...)`
+`void split(const char *str, const char *sep, ...);`
 
 Splits a string into tokens and assigns the token values
 to the specified list of variables.
@@ -167,7 +178,7 @@ calling `free()`.
 
 ---
 
-`void splitv(const char *str, const char *sep, type **pptr)`
+`void splitv(const char *str, const char *sep, type **pptr);`
 
 Splits a string into tokens and adds the token values
 to a dynamic array.
