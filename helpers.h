@@ -61,9 +61,9 @@
 #include <unistd.h>
 
 /**
- * @fn defer(func);
+ * @fn defer(func)
  *
- * @brief A variable attribute to define deffered function
+ * @brief A variable attribute to define deffered function.
  *
  * @param func a function invoked when the variable goes out of scope,
  * predefined functions: `close`, `fclose`, `free`, `vfree`.

@@ -1,7 +1,7 @@
 
-`defer(func);`
+`defer(func)`
 
-A variable attribute to define deffered function
+A variable attribute to define deffered function.
 
 * `func` -  a function invoked when the variable goes out of scope,
 predefined functions: `close`, `fclose`, `free`, `vfree`.
