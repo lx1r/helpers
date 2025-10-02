@@ -60,6 +60,14 @@
 #include <string.h>
 #include <unistd.h>
 
+/**
+ * @fn defer(func);
+ *
+ * @brief A variable attribute to define deffered function
+ *
+ * @param func a function invoked when the variable goes out of scope,
+ * predefined functions: `close`, `fclose`, `free`, `vfree`.
+ */
 #define defer(func) __attribute__((__cleanup__(___p##func)))
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
@@ -113,7 +121,7 @@ static inline size_t len(void *ptr)
  *
  * @param ref array iterator, not necessary to declare before
  * @param ptr pointer to an array
- * @param len number of elements to iterate (default is `len(ptr)`)
+ * @param len number of elements to iterate, default is `len(ptr)`
  *
  */
 #define ___foreach0(ref, ptr) ___foreach1(ref, ptr, len(ptr))
@@ -558,7 +566,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  *
  * @param sep separator between elements of the output array
  * @param ptr array of values or constants of standard type to print
- * @param len number of elements to output (default is `len()`)
+ * @param len number of elements to output, default is `len()`
  *
  * @return The number of bytes printed.
  */
@@ -618,7 +626,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  *
  * @param sep substring between the joined elements
  * @param ptr array of values or constants of standard type to join
- * @param len number of elements to join (default is `len(ptr)`)
+ * @param len number of elements to join, default is `len(ptr)`
  *
  * @return The pointer to joined string, should be released by calling `free()`.
  */

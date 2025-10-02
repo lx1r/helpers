@@ -1,4 +1,13 @@
 
+`defer(func);`
+
+A variable attribute to define deffered function
+
+* `func` -  a function invoked when the variable goes out of scope,
+predefined functions: `close`, `fclose`, `free`, `vfree`.
+
+---
+
 `size_t len(void *ptr);`
 
 Returns the number of elements in a dynamic or an associative array.
@@ -15,7 +24,7 @@ Iterate over an array.
 
 * `ref` -  array iterator, not necessary to declare before
 * `ptr` -  pointer to an array
-* `len` -  number of elements to iterate (default is `len(ptr)`)
+* `len` -  number of elements to iterate, default is `len(ptr)`
 
 
 ---
@@ -134,7 +143,7 @@ Print an array to the standard output stream.
 
 * `sep` -  separator between elements of the output array
 * `ptr` -  array of values or constants of standard type to print
-* `len` -  number of elements to output (default is `len()`)
+* `len` -  number of elements to output, default is `len()`
 
 **Returns:** The number of bytes printed.
 
@@ -156,7 +165,7 @@ Concatenates an array into a single string.
 
 * `sep` -  substring between the joined elements
 * `ptr` -  array of values or constants of standard type to join
-* `len` -  number of elements to join (default is `len(ptr)`)
+* `len` -  number of elements to join, default is `len(ptr)`
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
 
