@@ -106,7 +106,7 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
-/** 
+/**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
  * @brief Iterate over an array.
