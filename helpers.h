@@ -15,19 +15,19 @@
 	___nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#define ___fill0(ptr, p)
-#define ___fill1(ptr, p, x) (ptr)[p] = (x)
-#define ___fill2(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill1(ptr, p + 1, __VA_ARGS__)
-#define ___fill3(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill2(ptr, p + 1, __VA_ARGS__)
-#define ___fill4(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill3(ptr, p + 1, __VA_ARGS__)
-#define ___fill5(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill4(ptr, p + 1, __VA_ARGS__)
-#define ___fill6(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill5(ptr, p + 1, __VA_ARGS__)
-#define ___fill7(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill6(ptr, p + 1, __VA_ARGS__)
-#define ___fill8(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill7(ptr, p + 1, __VA_ARGS__)
-#define ___fill9(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill8(ptr, p + 1, __VA_ARGS__)
-#define ___fill10(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill9(ptr, p + 1, __VA_ARGS__)
-#define ___fill11(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill10(ptr, p + 1, __VA_ARGS__)
-#define ___fill12(ptr, p, x, ...) ___fill1(ptr, p, x); ___fill11(ptr, p + 1, __VA_ARGS__)
+#define ___fill0(ptr, i)
+#define ___fill1(ptr, i, x) (ptr)[i] = (x)
+#define ___fill2(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill1(ptr, i + 1, __VA_ARGS__)
+#define ___fill3(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill2(ptr, i + 1, __VA_ARGS__)
+#define ___fill4(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill3(ptr, i + 1, __VA_ARGS__)
+#define ___fill5(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill4(ptr, i + 1, __VA_ARGS__)
+#define ___fill6(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill5(ptr, i + 1, __VA_ARGS__)
+#define ___fill7(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill6(ptr, i + 1, __VA_ARGS__)
+#define ___fill8(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill7(ptr, i + 1, __VA_ARGS__)
+#define ___fill9(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill8(ptr, i + 1, __VA_ARGS__)
+#define ___fill10(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill9(ptr, i + 1, __VA_ARGS__)
+#define ___fill11(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill10(ptr, i + 1, __VA_ARGS__)
+#define ___fill12(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill11(ptr, i + 1, __VA_ARGS__)
 
 #define ___fill(ptr, ...)\
 	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
@@ -39,57 +39,39 @@
 
 #define static_len(ptr) (sizeof(ptr)/sizeof(ptr[0]))
 
-#undef __always_inline
-#define __always_inline inline __attribute__((always_inline))
+#define ___align(x, a)		___align_mask(x, (typeof(x))(a) - 1)
+#define ___align_down(x, a)	___align((x) - ((a) - 1), (a))
+#define ___align_mask(x, mask)	(((x) + (mask)) & ~(mask))
 
-#define ALIGN(x, a)		ALIGN_MASK(x, (typeof(x))(a) - 1)
-#define ALIGN_DOWN(x, a)	ALIGN((x) - ((a) - 1), (a))
-#define ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define ___nr_bits(x) (sizeof(x) * 8)
+#define ___bit_mask(nr, x) (((typeof(x))1) << ((nr) % ___nr_bits(x)))
+#define ___bit_word(nr, x) ((nr) / ___nr_bits(x))
 
-#define BITS_PER_BYTE	8
-#define BITS_PER_LONG	(sizeof(unsigned long)*BITS_PER_BYTE)
-#define BIT_MASK(nr)	(1UL << ((nr) % BITS_PER_LONG))
-#define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
-
-#include <stdbool.h>
-
-static __always_inline bool test_bit(unsigned long nr, unsigned long *bits)
-{
-	if (bits[BIT_WORD(nr)] & BIT_MASK(nr))
-		return true;
-	return false;
-}
-
-static __always_inline void set_bit(unsigned long nr, unsigned long *bits)
-{
-	bits[BIT_WORD(nr)] |= BIT_MASK(nr);
-}
-
-static __always_inline void clear_bit(unsigned long nr, unsigned long *bits)
-{
-	bits[BIT_WORD(nr)] &= ~BIT_MASK(nr);
-}
+#define ___test_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))]  &  ___bit_mask(nr, *(bits)))
+#define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
+#define ___clear_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] &= ~___bit_mask(nr, *(bits)))
 
 #ifndef NO_LIBC
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <malloc.h>
 #include <string.h>
 #include <unistd.h>
 
+#define defer(func) __attribute__((__cleanup__(___p##func)))
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
-#define defer(func) __attribute__((__cleanup__(___p##func)))
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define zfree(ptr) ___zfree((void **)(ptr))
 
-#define ___cap(ptr)		(ALIGN_DOWN(malloc_usable_size(ptr), sizeof(size_t)))
-#define ___user_sz(ptr, len)	(ALIGN((len) * sizeof(*(ptr)), sizeof(size_t)))
-#define ___meta_used_sz(len)	((BIT_WORD((len) - 1) + 1) * sizeof(unsigned long))
+#define ___cap(ptr)		(___align_down(malloc_usable_size(ptr), sizeof(size_t)))
+#define ___user_sz(ptr, len)	(___align((len) * sizeof(*(ptr)), sizeof(size_t)))
+#define ___meta_used_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
 	size_t has_used:1;
@@ -109,7 +91,7 @@ static inline unsigned long *___meta_used(struct meta *meta)
 }
 
 /**
- * @fn size_t len(void *ptr)
+ * @fn size_t len(void *ptr);
  *
  * @brief Returns the number of elements in a dynamic or an associative array.
  *
@@ -124,8 +106,16 @@ static inline size_t len(void *ptr)
 	return ___meta(ptr)->len;
 }
 
-/* Iterate over an array */
-
+/** 
+ * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
+ *
+ * @brief Iterate over an array.
+ *
+ * @param ref array iterator, not necessary to declare before
+ * @param ptr pointer to an array
+ * @param len number of elements to iterate (default is `len(ptr)`)
+ *
+ */
 #define ___foreach0(ref, ptr) ___foreach1(ref, ptr, len(ptr))
 #define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
@@ -175,15 +165,15 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 }
 
 #define ___meta_used_test(ptr, slot) ({\
-	test_bit(slot, ___meta_used(___meta(ptr)));\
+	___test_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 #define ___meta_used_set(ptr, slot) ({\
-	set_bit(slot, ___meta_used(___meta(ptr)));\
+	___set_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 #define ___meta_used_clear(ptr, slot) ({\
-	clear_bit(slot, ___meta_used(___meta(ptr)));\
+	___clear_bit(slot, ___meta_used(___meta(ptr)));\
 })
 
 static inline bool used(void *ptr, ssize_t slot)
@@ -194,7 +184,7 @@ static inline bool used(void *ptr, ssize_t slot)
 	struct meta *meta = ___meta(ptr);
 
 	return !meta->has_used ||
-		test_bit(slot, ___meta_used(meta));
+		___test_bit(slot, ___meta_used(meta));
 }
 
 #define reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
@@ -202,7 +192,7 @@ static inline bool used(void *ptr, ssize_t slot)
 #define reserve0(pptr) reserve1(pptr, 32)
 
 /**
- * @fn type *reserve(type **pptr, size len, bool map = false)
+ * @fn type *reserve(type **pptr, size len, bool map = false);
  *
  * @brief Pre-allocates memory for an array.
  *
@@ -216,7 +206,7 @@ static inline bool used(void *ptr, ssize_t slot)
 #define reserve(pptr, ...)\
 	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
-static inline size_t ___align_sz(size_t nb)
+static inline size_t ___aligned_sz(size_t nb)
 {
 	if (!nb) return 0;
 	/* initial size */
@@ -233,8 +223,10 @@ static inline size_t ___align_sz(size_t nb)
 	return nb + 1;
 }
 
+#define ___MALLOC_META (2*sizeof(size_t))
+
 /**
- * @fn ssize_t append(type **pptr, type init)
+ * @fn ssize_t append(type **pptr, type init);
  *
  * @brief Adds an element to the end of a dynamic array, expands memory
  * usage if necessary.
@@ -249,7 +241,8 @@ static inline size_t ___align_sz(size_t nb)
  */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
-	size_t sz_ = ___align_sz(___user_sz(*(pptr), len_) + sizeof(struct meta) + 16) - 16;\
+	size_t sz_ = ___aligned_sz(___user_sz(*(pptr), len_) + sizeof(struct meta) + \
+				   ___MALLOC_META) - ___MALLOC_META;\
 	typeof(*(pptr)) ptr_ = realloc(*(pptr), sz_);\
 	if (ptr_) {\
 		ptr_[len_ - 1] = (typeof(*ptr_))__VA_ARGS__;\
@@ -378,21 +371,21 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @fn mapof(key_type, val_type)
+ * @fn mapof(ktype, vtype)
  *
  * @brief Associative array element type.
  *
- * @param key_type associative array index (key) type, can be any non-pointer
+ * @param ktype associative array index (key) type, can be any non-pointer
  * type except a pointer to a null terminated string
- * @param val_type a type of value associated with the key, can be any type
+ * @param vtype a type of value associated with the key, can be any type
  *
  * To pass associative array pointers to functions, the associative array type
  * must be fully qualified using the `typedef` keyword.
  */
-#define mapof(key_type, val_type) struct { key_type key; val_type value; }
+#define mapof(ktype, vtype) struct { ktype key; vtype value; }
 
 /**
- * @fn ssize_t insert(mapof(key_type, val_type) **pptr, key_type key, val_type value)
+ * @fn ssize_t insert(mapof(ktype, vtype) **pptr, ktype key, vtype value);
  *
  * @brief Adds an element to a dynamic associative array, expands memory
  * usage if necessary.
@@ -406,8 +399,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
  *
- * @return Index in the array where the new value is inserted or
- * -1 something went wrong, the index is valid until any method on the
+ * @return Index in the array where the new value is inserted or `-1`
+ * if something went wrong, the index is valid until any method on the
  * associative array is called.
  */
 #define insert(pptr, k, ...) ({\
@@ -417,27 +410,27 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @fn ssize_t delete(mapof(key_type, val_type) **pptr, val_type *val_ref)
+ * @fn ssize_t delete(mapof(ktype, vtype) **pptr, vtype *ref);
  *
  * @brief Removes an element from an associative array.
  *
  * @param pptr pointer to the associative array
- * @param val_ref reference to a data value associated with a key
+ * @param ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
  *
- * @return Index in the array that `val_ref` belonged to,
+ * @return Index in the array that `ref` belonged to,
  * the index is valid until any associative array method is called.
  */
-#define delete(pptr, val_ref) ({\
+#define delete(pptr, ref) ({\
 	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(*(pptr)) slot_ptr_ = (void *)(val_ref) - ___value_offset(ptr_);\
+	typeof(*(pptr)) slot_ptr_ = (void *)(ref) - ___value_offset(ptr_);\
 	ssize_t slot_ = slot_ptr_ - ptr_;\
 	___meta_used_clear(ptr_, slot_);\
 	slot_;\
 })
 
 /**
- * @fn val_type *lookup(mapof(key_type, val_type) **pptr, key_type key)
+ * @fn vtype *lookup(mapof(ktype, vtype) **pptr, ktype key);
  *
  * @brief Searches a data associated with a key.
  *
@@ -458,26 +451,26 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 
 #define ___fill_pr_fmt(ptr, x)\
 	_Generic(x,\
-		 _Bool:                 ___fill_shift(ptr, '%', 'd'),\
-		 char:                  ___fill_shift(ptr, '%', 'c'),\
-		 signed char:           ___fill_shift(ptr, '%', 'h', 'h', 'i'),\
-		 unsigned char:         ___fill_shift(ptr, '%', 'h', 'h', 'u'),\
-		 signed short:          ___fill_shift(ptr, '%', 'h', 'i'),\
-		 unsigned short:        ___fill_shift(ptr, '%', 'h', 'u'),\
-		 signed int:            ___fill_shift(ptr, '%', 'i'),\
-		 unsigned int:          ___fill_shift(ptr, '%', 'u'),\
-		 signed long:           ___fill_shift(ptr, '%', 'l', 'i'),\
-		 unsigned long:         ___fill_shift(ptr, '%', 'l', 'u'),\
-		 signed long long:      ___fill_shift(ptr, '%', 'l', 'l', 'i'),\
-		 unsigned long long:    ___fill_shift(ptr, '%', 'l', 'l', 'u'),\
-		 float:                 ___fill_shift(ptr, '%', 'f'),\
-		 double:                ___fill_shift(ptr, '%', 'f'),\
-		 long double:           ___fill_shift(ptr, '%', 'L', 'f'),\
-		 char *:                ___fill_shift(ptr, '%', 's'),\
-		 const char *:          ___fill_shift(ptr, '%', 's'),\
-		 volatile char *:       ___fill_shift(ptr, '%', 's'),\
-		 volatile const char *: ___fill_shift(ptr, '%', 's'),\
-		 default:               ___fill_shift(ptr, '%', 'p'))
+		 _Bool:			___fill_shift(ptr, '%', 'd'),\
+		 char:			___fill_shift(ptr, '%', 'c'),\
+		 signed char:		___fill_shift(ptr, '%', 'h', 'h', 'i'),\
+		 unsigned char:		___fill_shift(ptr, '%', 'h', 'h', 'u'),\
+		 signed short:		___fill_shift(ptr, '%', 'h', 'i'),\
+		 unsigned short:	___fill_shift(ptr, '%', 'h', 'u'),\
+		 signed int:		___fill_shift(ptr, '%', 'i'),\
+		 unsigned int:		___fill_shift(ptr, '%', 'u'),\
+		 signed long:		___fill_shift(ptr, '%', 'l', 'i'),\
+		 unsigned long:		___fill_shift(ptr, '%', 'l', 'u'),\
+		 signed long long:	___fill_shift(ptr, '%', 'l', 'l', 'i'),\
+		 unsigned long long:	___fill_shift(ptr, '%', 'l', 'l', 'u'),\
+		 float:			___fill_shift(ptr, '%', 'f'),\
+		 double:		___fill_shift(ptr, '%', 'f'),\
+		 long double:		___fill_shift(ptr, '%', 'L', 'f'),\
+		 char *:		___fill_shift(ptr, '%', 's'),\
+		 const char *:		___fill_shift(ptr, '%', 's'),\
+		 volatile char *:	___fill_shift(ptr, '%', 's'),\
+		 volatile const char *:	___fill_shift(ptr, '%', 's'),\
+		 default:		___fill_shift(ptr, '%', 'p'))
 
 #define ___fill_fmt0(ptr, x)
 #define ___fill_fmt1(ptr, x) ___fill_pr_fmt(ptr, x)
@@ -506,7 +499,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
 /**
- * @fn int fprintln(FILE *fp, ...)
+ * @fn int fprintln(FILE *fp, ...);
  *
  * @brief Prints a line to a stream.
  *
@@ -525,7 +518,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 })
 
 /**
- * @fn int println(...)
+ * @fn int println(...);
  *
  * @brief Prints a line to the standard output stream.
  *
@@ -535,44 +528,44 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
-#define ___printv(fp, sep, tokens, nr_tokens) ({\
+#define ___printv(fp, sep, ptr, len) ({\
 	int nb_ = 0;\
-	size_t len_ = (nr_tokens);\
+	size_t len_ = (len);\
 	const char *sep_ = "";\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	typeof(tokens) *tokens_ptr_ = &(tokens);\
+	typeof(ptr) *pptr_ = &(ptr);\
 	___fill_pr_fmt(dst_, sep_);\
-	___fill_pr_fmt(dst_, **tokens_ptr_);\
+	___fill_pr_fmt(dst_, **pptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += fprintf(fp, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		nb_ += fprintf(fp, fmt_, sep_, (*pptr_)[i_]);\
 		if (i_ == 0) sep_ = (sep);\
 	}\
 	nb_;\
 })
 
-#define fprintv1(fp, sep, tokens, nr_tokens) ___printv(fp, sep, tokens, nr_tokens)
-#define fprintv0(fp, sep, tokens) fprintv1(fp, sep, tokens, len(tokens))
+#define fprintv1(fp, sep, ptr, len) ___printv(fp, sep, ptr, len)
+#define fprintv0(fp, sep, ptr) fprintv1(fp, sep, ptr, len(ptr))
 
-#define fprintv(fp, sep, tokens, ...)\
-	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, tokens, ##__VA_ARGS__)
+#define fprintv(fp, sep, ptr, ...)\
+	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, ptr, ##__VA_ARGS__)
 
 /**
- * @fn int printv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))
+ * @fn int printv(const char *sep, type *ptr, size_t len = len(ptr));
  *
  * @brief Print an array to the standard output stream.
  *
  * @param sep separator between elements of the output array
- * @param tokens array of values or constants of standard type to print
- * @param nr_tokens number of tokens to output (default is `len()`)
+ * @param ptr array of values or constants of standard type to print
+ * @param len number of elements to output (default is `len()`)
  *
  * @return The number of bytes printed.
  */
-#define printv(sep, tokens, ...) fprintv(stdout, sep, tokens, ##__VA_ARGS__)
+#define printv(sep, ptr, ...) fprintv(stdout, sep, ptr, ##__VA_ARGS__)
 
 /**
- * @fn char *join(...)
+ * @fn char *join(...);
  *
  * @brief Concatenates an list of values into a single string.
  *
@@ -591,46 +584,46 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	buf_;\
 })
 
-#define ___joinv(sep, tokens, nr_tokens) ({\
+#define ___joinv(sep, ptr, len) ({\
 	int nb_ = 0;\
-	size_t len_ = (nr_tokens);\
+	size_t len_ = (len);\
 	const char *sep_ = "";\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	typeof(tokens) *tokens_ptr_ = &(tokens);\
+	typeof(ptr) *pptr_ = &(ptr);\
 	___fill_pr_fmt(dst_, sep_);\
-	___fill_pr_fmt(dst_, **tokens_ptr_);\
+	___fill_pr_fmt(dst_, **pptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += snprintf(NULL, 0, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		nb_ += snprintf(NULL, 0, fmt_, sep_, (*pptr_)[i_]);\
 		if (i_ == 0) sep_ = (sep);\
 	}\
 	char *buf_ = malloc(nb_ + 1);\
 	nb_ = 0;\
 	sep_ = "";\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += sprintf(buf_ + nb_, fmt_, sep_, (*tokens_ptr_)[i_]);\
+		nb_ += sprintf(buf_ + nb_, fmt_, sep_, (*pptr_)[i_]);\
 		if (i_ == 0) sep_ = (sep);\
 	}\
 	buf_;\
 })
 
-#define joinv1(sep, tokens, nr_tokens) ___joinv(sep, tokens, nr_tokens)
-#define joinv0(sep, tokens) joinv1(sep, tokens, len(tokens))
+#define joinv1(sep, ptr, len) ___joinv(sep, ptr, len)
+#define joinv0(sep, ptr) joinv1(sep, ptr, len(ptr))
 
 /**
- * @fn char *joinv(const char *sep, type *tokens, size_t nr_tokens = len(tokens))
+ * @fn char *joinv(const char *sep, type *ptr, size_t len = len(ptr));
  *
  * @brief Concatenates an array into a single string.
  *
  * @param sep substring between the joined elements
- * @param tokens array of values or constants of standard type to join
- * @param nr_tokens number of elements to join (default is `len(tokens)`)
+ * @param ptr array of values or constants of standard type to join
+ * @param len number of elements to join (default is `len(ptr)`)
  *
  * @return The pointer to joined string, should be released by calling `free()`.
  */
-#define joinv(sep, tokens, ...)\
-	___apply(joinv, ___narg(__VA_ARGS__))(sep, tokens, ##__VA_ARGS__)
+#define joinv(sep, ptr, ...)\
+	___apply(joinv, ___narg(__VA_ARGS__))(sep, ptr, ##__VA_ARGS__)
 
 static inline char *___get_tok(const char *str, const char *sep, const char **next)
 {
@@ -660,22 +653,22 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	const char *str_ = str;\
 	(str_) ? \
 	_Generic(x,\
-		 _Bool:                 strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
-		 char:                  str_[0],\
-		 signed char:           (signed char)strtol(str_, NULL, 0),\
-		 unsigned char:         (unsigned char)strtoul(str_, NULL, 0),\
-		 signed short:          (signed short)strtol(str_, NULL, 0),\
-		 unsigned short:        (unsigned short)strtoul(str_, NULL, 0),\
-		 signed int:            (signed int)strtol(str_, NULL, 0),\
-		 unsigned int:          (unsigned int)strtoul(str_, NULL, 0),\
-		 signed long:           strtol(str_, NULL, 0),\
-		 unsigned long:         strtoul(str_, NULL, 0),\
-		 signed long long:      strtoll(str_, NULL, 0),\
-		 unsigned long long:    strtoull(str_, NULL, 0),\
-		 float:                 strtof(str_, NULL),\
-		 double:                strtod(str_, NULL),\
-		 long double:           strtold(str_, NULL),\
-		 char *:                strdup(str_)) : 0;\
+		 _Bool:			strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
+		 char:			str_[0],\
+		 signed char:		(signed char)strtol(str_, NULL, 0),\
+		 unsigned char:		(unsigned char)strtoul(str_, NULL, 0),\
+		 signed short:		(signed short)strtol(str_, NULL, 0),\
+		 unsigned short:	(unsigned short)strtoul(str_, NULL, 0),\
+		 signed int:		(signed int)strtol(str_, NULL, 0),\
+		 unsigned int:		(unsigned int)strtoul(str_, NULL, 0),\
+		 signed long:		strtol(str_, NULL, 0),\
+		 unsigned long:		strtoul(str_, NULL, 0),\
+		 signed long long:	strtoll(str_, NULL, 0),\
+		 unsigned long long:	strtoull(str_, NULL, 0),\
+		 float:			strtof(str_, NULL),\
+		 double:		strtod(str_, NULL),\
+		 long double:		strtold(str_, NULL),\
+		 char *:		strdup(str_)) : 0;\
 })
 
 #define ___get_val(str, sep, next, p) ({\
@@ -698,7 +691,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___split12(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split11(sep, next, __VA_ARGS__)
 
 /**
- * @fn void split(const char *str, const char *sep, ...)
+ * @fn void split(const char *str, const char *sep, ...);
  *
  * @brief Splits a string into tokens and assigns the token values
  * to the specified list of variables.
@@ -719,7 +712,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 })
 
 /**
- * @fn void splitv(const char *str, const char *sep, type **pptr)
+ * @fn void splitv(const char *str, const char *sep, type **pptr);
  *
  * @brief Splits a string into tokens and adds the token values
  * to a dynamic array.
