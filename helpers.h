@@ -79,7 +79,7 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 
 #define ___cap(ptr)		(___align_down(malloc_usable_size(ptr), sizeof(size_t)))
 #define ___user_sz(ptr, len)	(___align((len) * sizeof(*(ptr)), sizeof(size_t)))
-#define ___meta_used_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
+#define ___used_sz(len)		((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
 	size_t has_used:1;
@@ -91,11 +91,31 @@ static inline struct meta *___meta(void *ptr)
 	return ptr + ___cap(ptr) - sizeof(struct meta);
 }
 
-static inline unsigned long *___meta_used(struct meta *meta)
+static inline unsigned long *___used(struct meta *meta)
 {
 	if (!meta->has_used)
 		return NULL;
-	return (void *)meta - ___meta_used_sz(meta->len);
+	return (void *)meta - ___used_sz(meta->len);
+}
+
+#define ___used_test(ptr, slot) ({\
+				 ___test_bit(slot, ___used(___meta(ptr)));\
+				 })
+
+#define ___used_set(ptr, slot) ({\
+				___set_bit(slot, ___used(___meta(ptr)));\
+				})
+
+#define ___used_clear(ptr, slot) ({\
+				  ___clear_bit(slot, ___used(___meta(ptr)));\
+				  })
+
+static inline bool ___in_use(void *ptr, ssize_t slot)
+{
+	struct meta *meta = ___meta(ptr);
+
+	return !meta->has_used ||
+		___test_bit(slot, ___used(meta));
 }
 
 /**
@@ -117,14 +137,14 @@ static inline size_t len(void *ptr)
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
- * @brief Iterate over an array.
+ * @brief Iterate over a static, a dynamic or an associative array.
  *
- * @param ref array iterator, not necessary to declare before
+ * @param ref array iterator name, not necessary to declare before
  * @param ptr pointer to an array
  * @param len number of elements to iterate, default is `len(ptr)`
  *
  */
-#define ___foreach0(ref, ptr) ___foreach1(ref, ptr, len(ptr))
+#define ___foreach0(ref, ptr) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) if (___in_use(ptr, (ref) - (ptr)))
 #define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
 #define foreach(ref, ptr, ...) \
@@ -133,7 +153,9 @@ static inline size_t len(void *ptr)
 static inline void ___pvfree(void *pptr)
 {
 	void **ptr = *(void ***)pptr;
-	for (size_t i = 0; i < len(ptr); i++)
+	size_t n = len(ptr);
+
+	for (size_t i = 0; i < n; i++)
 		free(ptr[i]);
 	free(ptr);
 }
@@ -151,11 +173,11 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 		struct meta *meta = ___meta(ptr);
 		has_used = meta->has_used;
 		prev_len = meta->len;
-		prev_used = ___meta_used(meta);
-		prev_used_sz = ___meta_used_sz(prev_len);
+		prev_used = ___used(meta);
+		prev_used_sz = ___used_sz(prev_len);
 	}
 
-	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_used ? ___meta_used_sz(len) : 0));
+	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_used ? ___used_sz(len) : 0));
 	if (!ptr)
 		return NULL;
 
@@ -163,36 +185,13 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 	meta->has_used = has_used;
 	meta->len = has_used ? len : prev_len;
 
-	unsigned long *used = ___meta_used(meta);
+	unsigned long *used = ___used(meta);
 	if (prev_used)
 		memmove(used, prev_used, prev_used_sz);
 	if (has_used)
-		memset(used + prev_used_sz, 0, ___meta_used_sz(len) - prev_used_sz);
+		memset(used + prev_used_sz, 0, ___used_sz(len) - prev_used_sz);
 
 	return ptr;
-}
-
-#define ___meta_used_test(ptr, slot) ({\
-	___test_bit(slot, ___meta_used(___meta(ptr)));\
-})
-
-#define ___meta_used_set(ptr, slot) ({\
-	___set_bit(slot, ___meta_used(___meta(ptr)));\
-})
-
-#define ___meta_used_clear(ptr, slot) ({\
-	___clear_bit(slot, ___meta_used(___meta(ptr)));\
-})
-
-static inline bool used(void *ptr, ssize_t slot)
-{
-	if (!ptr)
-		return false;
-
-	struct meta *meta = ___meta(ptr);
-
-	return !meta->has_used ||
-		___test_bit(slot, ___meta_used(meta));
 }
 
 #define reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
@@ -293,9 +292,9 @@ static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, siz
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
-		if (!___meta_used_test(ptr, slot)) {
+		if (!___used_test(ptr, slot)) {
 			memcpy(ptr + slot*data_sz, data, data_sz);
-			___meta_used_set(ptr, slot);
+			___used_set(ptr, slot);
 			return slot;
 		}
 	}
@@ -313,7 +312,7 @@ static inline void *___rehash(void *ptr, size_t ext_cap, size_t data_sz, size_t 
 		return NULL;
 
 	for (size_t slot = 0; slot < cap; slot++) {
-		if (___meta_used_test(ptr, slot)) {
+		if (___used_test(ptr, slot)) {
 			ssize_t rc = ___try_insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(ext_ptr);
@@ -353,7 +352,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
 		___lookup_probes++;
-		if (___meta_used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
+		if (___used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
 			return ptr + slot*data_sz + val_off;
 		}
 	}
@@ -433,7 +432,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	typeof(*(pptr)) ptr_ = *(pptr);\
 	typeof(*(pptr)) slot_ptr_ = (void *)(ref) - ___value_offset(ptr_);\
 	ssize_t slot_ = slot_ptr_ - ptr_;\
-	___meta_used_clear(ptr_, slot_);\
+	___used_clear(ptr_, slot_);\
 	slot_;\
 })
 
