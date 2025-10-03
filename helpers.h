@@ -98,17 +98,9 @@ static inline unsigned long *___used(struct meta *meta)
 	return (void *)meta - ___used_sz(meta->len);
 }
 
-#define ___used_test(ptr, slot) ({\
-				 ___test_bit(slot, ___used(___meta(ptr)));\
-				 })
-
-#define ___used_set(ptr, slot) ({\
-				___set_bit(slot, ___used(___meta(ptr)));\
-				})
-
-#define ___used_clear(ptr, slot) ({\
-				  ___clear_bit(slot, ___used(___meta(ptr)));\
-				  })
+#define ___used_test(ptr, slot) ___test_bit(slot, ___used(___meta(ptr)))
+#define ___used_set(ptr, slot) ___set_bit(slot, ___used(___meta(ptr)))
+#define ___used_clear(ptr, slot) ___clear_bit(slot, ___used(___meta(ptr)))
 
 static inline bool ___in_use(void *ptr, ssize_t slot)
 {
@@ -230,7 +222,7 @@ static inline size_t ___aligned_sz(size_t nb)
 	return nb + 1;
 }
 
-#define ___MALLOC_META (2*sizeof(size_t))
+#define ___MALLOC_META (2 * sizeof(size_t))
 
 /**
  * @fn ssize_t append(type **pptr, type init);
