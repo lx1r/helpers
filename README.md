@@ -20,9 +20,9 @@ Returns the number of elements in a dynamic or an associative array.
 
 `foreach(type *ref, type *ptr, size_t len = len(ptr))`
 
-Iterate over an array.
+Iterate over a static, a dynamic or an associative array.
 
-* `ref` -  array iterator, not necessary to declare before
+* `ref` -  array iterator name, not necessary to declare before
 * `ptr` -  pointer to an array
 * `len` -  number of elements to iterate, default is `len(ptr)`
 

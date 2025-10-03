@@ -38,8 +38,8 @@ int main()
 	append(&units, {3, 33, 333, 3333});
 
 	print("len=", len(units), ":");
-	for (int i = 0; i < len(units); i++)
-		print(" ", units[i].data1);
+	foreach (unit, units)
+		print(" ", unit->data1);
 	println();
 
 	return 0;

@@ -47,9 +47,8 @@ void del(int key)
 void walk()
 {
 	println("len=", len(ptr));
-	foreach(ref, ptr)
-		if (used(ptr, ref - ptr))
-			println("slot=", ref - ptr, " key=", ref->key, " data=", ref->value);
+	foreach (ref, ptr)
+		println("slot=", ref - ptr, " key=", ref->key, " data=", ref->value);
 }
 
 int main()
@@ -78,7 +77,7 @@ int main()
 	walk();
 
 	___lookup_probes = 0;
-	foreach(it, keys) find(*it);
+	foreach (it, keys) find(*it);
 	println("probes per lookup: ", ___lookup_probes/(double)len(keys));
 
 	del(7);
