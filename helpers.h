@@ -108,6 +108,19 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
 		___test_bit(slot, ___used(meta));
 }
 
+static inline size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+{
+	return n / c;
+}
+
+static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
+				    size_t n __attribute__((__unused__)))
+{
+	if (!ptr)
+		return 0;
+	return ___meta(ptr)->len;
+}
+
 /**
  * @fn size_t len(void *ptr);
  *
@@ -120,15 +133,13 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
  */
 #define len(ptr) \
 	_Generic(&(ptr), \
-		 typeof(*(ptr)) **: (ptr) ? ___meta(ptr)->len : 0UL, \
-		 default: sizeof(ptr) / sizeof((ptr)[0]))
-#pragma GCC diagnostic ignored "-Wsizeof-pointer-div"
+		 typeof(*(ptr)) **: ___dynamic_len, \
+		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
- * @brief Iterate over a static, a variable-length, dynamic or
- * an associative array.
+ * @brief Iterate over a dynamic or an associative array.
  *
  * @param ref array iterator name, not necessary to declare before
  * @param ptr pointer to an array

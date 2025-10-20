@@ -10,7 +10,8 @@ predefined functions: `close`, `fclose`, `free`, `vfree`.
 
 `size_t len(void *ptr);`
 
-Returns the number of elements in a dynamic or an associative array.
+Returns the number of elements in a static, a variable-length,
+dynamically growable or an associative array.
 
 * `ptr` -  pointer to the dynamic or associative array
 
@@ -20,7 +21,7 @@ Returns the number of elements in a dynamic or an associative array.
 
 `foreach(type *ref, type *ptr, size_t len = len(ptr))`
 
-Iterate over a static, a dynamic or an associative array.
+Iterate over a dynamic or an associative array.
 
 * `ref` -  array iterator name, not necessary to declare before
 * `ptr` -  pointer to an array
