@@ -119,9 +119,9 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
  * @return Number of elements in the array.
  */
 #define len(ptr) \
-	(__builtin_types_compatible_p(typeof(ptr), typeof(&(ptr)[0])) ? \
-	((ptr) ? ___meta(ptr)->len : 0) : \
-	(sizeof(ptr)/sizeof((ptr)[0])))
+	_Generic(&(ptr), \
+		 typeof(*(ptr)) **: (ptr) ? ___meta(ptr)->len : 0UL, \
+		 default: sizeof(ptr) / sizeof((ptr)[0]))
 #pragma GCC diagnostic ignored "-Wsizeof-pointer-div"
 
 /**
