@@ -120,8 +120,9 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
  */
 #define len(ptr) \
 	__builtin_types_compatible_p(typeof(ptr), typeof(&(ptr)[0])) ? \
-	___meta(ptr)->len : \
+	((ptr) ? ___meta(ptr)->len : 0) : \
 	(sizeof(ptr)/sizeof((ptr)[0]))
+#pragma GCC diagnostic ignored "-Wsizeof-pointer-div"
 
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
