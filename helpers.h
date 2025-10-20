@@ -37,8 +37,6 @@
 	(ptr) += ___narg(__VA_ARGS__);\
 })
 
-#define static_len(ptr) (sizeof(ptr)/sizeof(ptr[0]))
-
 #define ___align(x, a)		___align_mask(x, (typeof(x))(a) - 1)
 #define ___align_down(x, a)	___align((x) - ((a) - 1), (a))
 #define ___align_mask(x, mask)	(((x) + (mask)) & ~(mask))
