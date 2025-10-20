@@ -113,23 +113,23 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
 /**
  * @fn size_t len(void *ptr);
  *
- * @brief Returns the number of elements in a dynamic or an associative array.
+ * @brief Returns the number of elements in a static, a variable-length,
+ * dynamically growable or an associative array.
  *
  * @param ptr pointer to the dynamic or associative array
  *
  * @return Number of elements in the array.
  */
-static inline size_t len(void *ptr)
-{
-	if (!ptr)
-		return 0;
-	return ___meta(ptr)->len;
-}
+#define len(ptr) \
+	__builtin_types_compatible_p(typeof(ptr), typeof(&(ptr)[0])) ? \
+	___meta(ptr)->len : \
+	(sizeof(ptr)/sizeof((ptr)[0]))
 
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
- * @brief Iterate over a static, a dynamic or an associative array.
+ * @brief Iterate over a static, a variable-length, dynamic or
+ * an associative array.
  *
  * @param ref array iterator name, not necessary to declare before
  * @param ptr pointer to an array
