@@ -84,25 +84,25 @@ sub=
 
 sep=/
 str=dir1/dir2/dir3
-dir0=dir1
-dir1=dir2
-dir2=dir3
+dir=dir1
+dir=dir2
+dir=dir3
 
 sep=/_/
 str=di/r1/_/di/r2/_/di/r3
-dir0=di/r1
-dir1=di/r2
-dir2=di/r3
+dir=di/r1
+dir=di/r2
+dir=di/r3
 
 sep=$tod$
 str=$tod$dir1$tod$dir2$tod$dir3$tod$
-dir0=
-dir1=dir1
-dir2=dir2
+dir=
+dir=dir1
+dir=dir2
 
 sep=$tod$
 str=dir1$tod$dir2$tod$dir3
-dir0=dir1
-dir1=dir2
-dir2=dir3
+dir=dir1
+dir=dir2
+dir=dir3
 

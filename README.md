@@ -21,7 +21,8 @@ dynamically growable or an associative array.
 
 `foreach(type *ref, type *ptr, size_t len = len(ptr))`
 
-Iterate over a dynamic or an associative array.
+Iterate over a static, a variable-length, a dynamic or
+an associative array.
 
 * `ref` -  array iterator name, not necessary to declare before
 * `ptr` -  pointer to an array

@@ -26,8 +26,8 @@ void test_split3(char *str, char *sep)
 	println("str=", str);
 	split(str, sep, &dir[0], &dir[1], &dir[2]);
 
-	for (int i = 0; i < len(dir); i++)
-		println("dir", i, "=", dir[i]);
+	foreach (d, dir)
+		println("dir=", *d);
 	println();
 }
 
