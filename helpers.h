@@ -100,7 +100,7 @@ static inline unsigned long *___used(struct meta *meta)
 #define ___used_set(ptr, slot) ___set_bit(slot, ___used(___meta(ptr)))
 #define ___used_clear(ptr, slot) ___clear_bit(slot, ___used(___meta(ptr)))
 
-static inline bool ___in_use(void *ptr, ssize_t slot)
+static inline bool ___in_use_dynamic(void *ptr, ssize_t slot)
 {
 	struct meta *meta = ___meta(ptr);
 
@@ -108,7 +108,12 @@ static inline bool ___in_use(void *ptr, ssize_t slot)
 		___test_bit(slot, ___used(meta));
 }
 
-static inline size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+#define ___in_use(ptr, slot) \
+	_Generic(&(ptr), \
+		 typeof(*(ptr)) **: ___in_use_dynamic(ptr, slot), \
+		 default: true)
+
+static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
 {
 	return n / c;
 }
@@ -134,12 +139,13 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 #define len(ptr) \
 	_Generic(&(ptr), \
 		 typeof(*(ptr)) **: ___dynamic_len, \
-		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
+		 default: ___builtin_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
- * @brief Iterate over a dynamic or an associative array.
+ * @brief Iterate over a static, a variable-length, a dynamic or
+ * an associative array.
  *
  * @param ref array iterator name, not necessary to declare before
  * @param ptr pointer to an array
