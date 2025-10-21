@@ -221,12 +221,11 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
 #define reserve(pptr, ...)\
 	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
-static inline size_t ___aligned_sz(size_t nb)
+static inline size_t ___grow(size_t nb)
 {
-	if (!nb) return 0;
 	/* initial size */
-	if (!(nb & ~0xf))
-		return 64;
+	if (!(nb & ~0x3f))
+		return 0x40;
 	/* align to page if large enought */
 	if (nb & ~0xfff)
 		return (nb + 0xfff) & ~0xfff;
@@ -235,10 +234,11 @@ static inline size_t ___aligned_sz(size_t nb)
 	nb |= (nb >> 1);
 	nb |= (nb >> 2);
 	nb |= (nb >> 4);
+	nb |= (nb >> 8);
 	return nb + 1;
 }
 
-#define ___MALLOC_META (2 * sizeof(size_t))
+#define ___MALLOC_META sizeof(size_t)
 
 /**
  * @fn ssize_t append(type **pptr, type init);
@@ -256,8 +256,8 @@ static inline size_t ___aligned_sz(size_t nb)
  */
 #define append(pptr, ...) ({\
 	ssize_t len_ = len(*(pptr)) + 1;\
-	size_t sz_ = ___aligned_sz(___user_sz(*(pptr), len_) + sizeof(struct meta) + \
-				   ___MALLOC_META) - ___MALLOC_META;\
+	size_t sz_ = ___grow(___user_sz(*(pptr), len_) + sizeof(struct meta) + \
+			     ___MALLOC_META) - ___MALLOC_META;\
 	typeof(*(pptr)) ptr_ = realloc(*(pptr), sz_);\
 	if (ptr_) {\
 		ptr_[len_ - 1] = (typeof(*ptr_))__VA_ARGS__;\
