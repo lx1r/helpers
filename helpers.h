@@ -762,5 +762,39 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define func(args, expr)\
 	({ typeof(({ ___apply(___decl, ___narg args) args expr; })) ___func args { return expr; } ___func; })
 
+#define map(fn, lt) ({\
+        typeof(&(*(lt))) map_ = NULL;\
+        foreach (ref, lt) append(&map_, fn(*ref));\
+        map_;\
+})
+
+#define filter(fn, lt) ({\
+        typeof(lt) filter_ = NULL;\
+        foreach (ref, lt) if (fn(*ref)) append(&filter_, *ref);\
+        filter_;\
+})
+
+#define reduce(fn, lt) ({\
+        typeof(fn(0, lt[0])) reduce_ = 0;\
+        foreach (ref, lt) reduce_ = fn(reduce_, *ref);\
+        reduce_;\
+})
+
+#define count(lt) \
+        reduce(func((size_t a, typeof(*(lt)) b __attribute__((__unused__))), a + 1), lt)
+
+        foreach (e, lx) println(*e);
+        size_t res = reduce(func((size_t a, int b), a + b), lx);
+        println("res=", res);
+
+        int *ly = map(func((int a), a + 10), lx);
+        foreach (e, ly) println(*e);
+        println("cnt=", count(ly));
+
+        int *lz = filter(func((int a), a % 2), ly);
+        foreach (e, lz) println(*e);
+        reduce(func((size_t a, int b), a + println(b)), lz);
+        println("cnt=", count(lz));
+
 #endif /* NO_LIBC */
 #endif
