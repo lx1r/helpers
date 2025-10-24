@@ -77,10 +77,10 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 
 #define ___cap(ptr)		(___align_down(malloc_usable_size(ptr), sizeof(size_t)))
 #define ___user_sz(ptr, len)	(___align((len) * sizeof(*(ptr)), sizeof(size_t)))
-#define ___used_sz(len)		((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
+#define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
-	size_t has_used:1;
+	size_t has_inuse:1;
 	size_t len:63;
 };
 
@@ -89,28 +89,28 @@ static inline struct meta *___meta(void *ptr)
 	return ptr + ___cap(ptr) - sizeof(struct meta);
 }
 
-static inline unsigned long *___used(struct meta *meta)
+static inline unsigned long *___inuse_bits(struct meta *meta)
 {
-	if (!meta->has_used)
+	if (!meta->has_inuse)
 		return NULL;
-	return (void *)meta - ___used_sz(meta->len);
+	return (void *)meta - ___inuse_sz(meta->len);
 }
 
-#define ___used_test(ptr, slot) ___test_bit(slot, ___used(___meta(ptr)))
-#define ___used_set(ptr, slot) ___set_bit(slot, ___used(___meta(ptr)))
-#define ___used_clear(ptr, slot) ___clear_bit(slot, ___used(___meta(ptr)))
+#define ___inuse_test(ptr, slot)	___test_bit(slot, ___inuse_bits(___meta(ptr)))
+#define ___inuse_set(ptr, slot)		___set_bit(slot, ___inuse_bits(___meta(ptr)))
+#define ___inuse_clear(ptr, slot)	___clear_bit(slot, ___inuse_bits(___meta(ptr)))
 
-static inline bool ___in_use_dynamic(void *ptr, ssize_t slot)
+static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
 	struct meta *meta = ___meta(ptr);
 
-	return !meta->has_used ||
-		___test_bit(slot, ___used(meta));
+	return !meta->has_inuse ||
+		___test_bit(slot, ___inuse_bits(meta));
 }
 
-#define ___in_use(ptr, slot) \
+#define ___inuse(ptr, slot) \
 	_Generic(&(ptr), \
-		 typeof(*(ptr)) **: ___in_use_dynamic(ptr, slot), \
+		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot), \
 		 default: true)
 
 static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
@@ -152,7 +152,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
  * @param len number of elements to iterate, default is `len(ptr)`
  *
  */
-#define ___foreach0(ref, ptr) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) if (___in_use(ptr, (ref) - (ptr)))
+#define ___foreach0(ref, ptr) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) if (___inuse(ptr, (ref) - (ptr)))
 #define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
 #define foreach(ref, ptr, ...) \
@@ -168,36 +168,36 @@ static inline void ___pvfree(void *pptr)
 	free(ptr);
 }
 
-static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_used)
+static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
 {
 	size_t prev_len = 0;
-	unsigned long *prev_used = NULL;
-	size_t prev_used_sz = 0;
+	unsigned long *prev_inuse = NULL;
+	size_t prev_inuse_sz = 0;
 
 	if (!len)
 		return ptr;
 
 	if (ptr) {
 		struct meta *meta = ___meta(ptr);
-		has_used = meta->has_used;
+		has_inuse = meta->has_inuse;
 		prev_len = meta->len;
-		prev_used = ___used(meta);
-		prev_used_sz = ___used_sz(prev_len);
+		prev_inuse = ___inuse_bits(meta);
+		prev_inuse_sz = ___inuse_sz(prev_len);
 	}
 
-	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_used ? ___used_sz(len) : 0));
+	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_inuse ? ___inuse_sz(len) : 0));
 	if (!ptr)
 		return NULL;
 
 	struct meta *meta = ___meta(ptr);
-	meta->has_used = has_used;
-	meta->len = has_used ? len : prev_len;
+	meta->has_inuse = has_inuse;
+	meta->len = has_inuse ? len : prev_len;
 
-	unsigned long *used = ___used(meta);
-	if (prev_used)
-		memmove(used, prev_used, prev_used_sz);
-	if (has_used)
-		memset(used + prev_used_sz, 0, ___used_sz(len) - prev_used_sz);
+	unsigned long *inuse = ___inuse_bits(meta);
+	if (prev_inuse)
+		memmove(inuse, prev_inuse, prev_inuse_sz);
+	if (has_inuse)
+		memset(inuse + prev_inuse_sz, 0, ___inuse_sz(len) - prev_inuse_sz);
 
 	return ptr;
 }
@@ -255,18 +255,18 @@ static inline size_t ___grow(size_t nb)
  * dynamic array is called.
  */
 #define append(pptr, ...) ({\
-	ssize_t len_ = len(*(pptr)) + 1;\
-	size_t sz_ = ___grow(___user_sz(*(pptr), len_) + sizeof(struct meta) + \
-			     ___MALLOC_META) - ___MALLOC_META;\
-	typeof(*(pptr)) ptr_ = realloc(*(pptr), sz_);\
+	ssize_t slot_ = len(*(pptr));\
+	size_t new_sz_ = ___grow(___user_sz(*(pptr), slot_ + 1) + sizeof(struct meta) + \
+				 ___MALLOC_META) - ___MALLOC_META;\
+	typeof(*(pptr)) ptr_ = realloc(*(pptr), new_sz_);\
 	if (ptr_) {\
-		ptr_[len_ - 1] = (typeof(*ptr_))__VA_ARGS__;\
-		___meta(ptr_)->len = len_;\
+		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
+		___meta(ptr_)->len = slot_ + 1;\
 		*(pptr) = ptr_;\
 	} else {\
-		len_ = 0;\
+		slot_ = -1;\
 	}\
-	len_ - 1;\
+	slot_;\
 })
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
@@ -291,37 +291,37 @@ static inline unsigned long ___hnv1az(const char *key) {
 #define ___PROBE_STEP 5
 #endif
 
-static inline ssize_t ___try_insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
+static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
-	unsigned long hash = hashfn(data, key_sz);
+	unsigned long hash = hashfn(pair, key_sz);
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
-		if (!___used_test(ptr, slot)) {
-			memcpy(ptr + slot*data_sz, data, data_sz);
-			___used_set(ptr, slot);
+		if (!___inuse_test(ptr, slot)) {
+			memcpy(ptr + slot*pair_sz, pair, pair_sz);
+			___inuse_set(ptr, slot);
 			return slot;
 		}
 	}
 	return -1;
 }
 
-static inline void *___rehash(void *ptr, size_t ext_cap, size_t data_sz, size_t key_sz,
+static inline void *___rehash(void *ptr, size_t ext_cap, size_t pair_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
 	if (!ext_cap) ext_cap = 32;
 
-	void *ext_ptr = ___extend(NULL, ext_cap, data_sz, true);
+	void *ext_ptr = ___extend(NULL, ext_cap, pair_sz, true);
 	if (!ext_ptr)
 		return NULL;
 
 	for (size_t slot = 0; slot < cap; slot++) {
-		if (___used_test(ptr, slot)) {
-			ssize_t rc = ___try_insert(&ext_ptr, ptr + slot*data_sz, data_sz, key_sz, hashfn);
+		if (___inuse_test(ptr, slot)) {
+			ssize_t rc = ___try_insert(&ext_ptr, ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(ext_ptr);
 				return NULL;
@@ -332,15 +332,15 @@ static inline void *___rehash(void *ptr, size_t ext_cap, size_t data_sz, size_t 
 	return ext_ptr;
 }
 
-static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t key_sz,
+static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	do {
-		size_t slot = ___try_insert(pptr, data, data_sz, key_sz, hashfn);
+		size_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
-		ptr = ___rehash(ptr, 2*len(ptr), data_sz, key_sz, hashfn);
+		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -349,7 +349,7 @@ static inline ssize_t ___insert(void **pptr, void *data, size_t data_sz, size_t 
 
 static size_t ___lookup_probes = 0;
 
-static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t key_sz, size_t val_off,
+static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz, size_t val_off,
 			      unsigned long (*hashfn)(const void *, size_t),
 			      int (*cmprfn)(const void *, const void *, size_t))
 {
@@ -360,8 +360,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
 		size_t slot = (hash + i) % cap;
 		___lookup_probes++;
-		if (___used_test(ptr, slot) && cmprfn(ptr + slot*data_sz, key_ptr, key_sz) == 0) {
-			return ptr + slot*data_sz + val_off;
+		if (___inuse_test(ptr, slot) && cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0) {
+			return ptr + slot*pair_sz + val_off;
 		}
 	}
 	return NULL;
@@ -386,7 +386,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 #define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
 
 /**
- * @fn mapof(ktype, vtype)
+ * @fn pair(ktype, vtype)
  *
  * @brief Associative array element type.
  *
@@ -397,10 +397,10 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * To pass associative array pointers to functions, the associative array type
  * must be fully qualified using the `typedef` keyword.
  */
-#define mapof(ktype, vtype) struct { ktype key; vtype value; }
+#define pair(ktype, vtype) struct { ktype key; vtype value; }
 
 /**
- * @fn ssize_t insert(mapof(ktype, vtype) **pptr, ktype key, vtype value);
+ * @fn ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);
  *
  * @brief Adds an element to a dynamic associative array, expands memory
  * usage if necessary.
@@ -409,7 +409,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * added, to prevent this, the `lookup` method should be used.
  *
  * @param pptr pointer to the associative array, may be declared using
- * `mapof` macro
+ * `pair` macro
  * @param key associative array index value, maybe any standard type
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
@@ -419,13 +419,13 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
  * associative array is called.
  */
 #define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) data_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	___decl_hashfn(data_.key, hashfn_);\
-	___insert((void **)pptr, &data_, sizeof(data_), sizeof((*(pptr))->key), hashfn_);\
+	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+	___decl_hashfn(pair_.key, hashfn_);\
+	___insert((void **)pptr, &pair_, sizeof(pair_), sizeof((*(pptr))->key), hashfn_);\
 })
 
 /**
- * @fn ssize_t delete(mapof(ktype, vtype) **pptr, vtype *ref);
+ * @fn ssize_t delete(pair(ktype, vtype) **pptr, vtype *ref);
  *
  * @brief Removes an element from an associative array.
  *
@@ -440,12 +440,12 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t data_sz, size_t
 	typeof(*(pptr)) ptr_ = *(pptr);\
 	typeof(*(pptr)) slot_ptr_ = (void *)(ref) - ___value_offset(ptr_);\
 	ssize_t slot_ = slot_ptr_ - ptr_;\
-	___used_clear(ptr_, slot_);\
+	___inuse_clear(ptr_, slot_);\
 	slot_;\
 })
 
 /**
- * @fn vtype *lookup(mapof(ktype, vtype) **pptr, ktype key);
+ * @fn vtype *lookup(pair(ktype, vtype) **pptr, ktype key);
  *
  * @brief Searches a data associated with a key.
  *
@@ -763,21 +763,21 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	({ typeof(({ ___apply(___decl, ___narg args) args expr; })) ___func args { return expr; } ___func; })
 
 #define map(fn, lt) ({\
-	typeof(&(*(lt))) map_ = NULL;\
-	foreach (ref, lt) append(&map_, fn(*ref));\
-	map_;\
+	typeof(&(*(lt))) ret_ = NULL;\
+	foreach (ref, lt) append(&ret_, fn(*ref));\
+	ret_;\
 })
 
 #define filter(fn, lt) ({\
-	typeof(lt) filter_ = NULL;\
-	foreach (ref, lt) if (fn(*ref)) append(&filter_, *ref);\
-	filter_;\
+	typeof(lt) ret_ = NULL;\
+	foreach (ref, lt) if (fn(*ref)) append(&ret_, *ref);\
+	ret_;\
 })
 
 #define reduce(fn, lt) ({\
-	typeof(fn(0, lt[0])) reduce_ = 0;\
-	foreach (ref, lt) reduce_ = fn(reduce_, *ref);\
-	reduce_;\
+	typeof(fn(0, lt[0])) ret_ = 0;\
+	foreach (ref, lt) ret_ = fn(ret_, *ref);\
+	ret_;\
 })
 
 #define count(lt) \
