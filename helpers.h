@@ -129,8 +129,9 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 /**
  * @fn size_t len(void *ptr);
  *
- * @brief Returns the number of elements in a static, a variable-length,
- * dynamically growable or an associative array.
+ * @brief Returns the number of elements in a static, a variable-length or
+ * dynamically growable array. For associative array the function returns
+ * the number of elements of the underlying dynamic array.
  *
  * @param ptr pointer to the dynamic or associative array
  *

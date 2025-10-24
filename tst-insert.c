@@ -1,6 +1,6 @@
 #include "helpers.h"
 
-mapof(int, int) *ptr = NULL, *prev;
+pair(int, int) *ptr = NULL, *prev;
 int *keys = NULL;
 
 static inline unsigned xrand()

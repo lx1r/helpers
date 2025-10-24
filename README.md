@@ -10,8 +10,9 @@ predefined functions: `close`, `fclose`, `free`, `vfree`.
 
 `size_t len(void *ptr);`
 
-Returns the number of elements in a static, a variable-length,
-dynamically growable or an associative array.
+Returns the number of elements in a static, a variable-length or
+dynamically growable array. For associative array the function returns
+the number of elements of the underlying dynamic array.
 
 * `ptr` -  pointer to the dynamic or associative array
 
@@ -59,7 +60,7 @@ dynamic array is called.
 
 ---
 
-`mapof(ktype, vtype)`
+`pair(ktype, vtype)`
 
 Associative array element type.
 
@@ -72,7 +73,7 @@ must be fully qualified using the `typedef` keyword.
 
 ---
 
-`ssize_t insert(mapof(ktype, vtype) **pptr, ktype key, vtype value);`
+`ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);`
 
 Adds an element to a dynamic associative array, expands memory
 usage if necessary.
@@ -81,7 +82,7 @@ If an element with the same key exists, a duplicate element will be
 added, to prevent this, the `lookup` method should be used.
 
 * `pptr` -  pointer to the associative array, may be declared using
-`mapof` macro
+`pair` macro
 * `key` -  associative array index value, maybe any standard type
 * `init` -  initializer for a new data element, may be an aggregate
 initializer list
@@ -92,7 +93,7 @@ associative array is called.
 
 ---
 
-`ssize_t delete(mapof(ktype, vtype) **pptr, vtype *ref);`
+`ssize_t delete(pair(ktype, vtype) **pptr, vtype *ref);`
 
 Removes an element from an associative array.
 
@@ -105,7 +106,7 @@ the index is valid until any associative array method is called.
 
 ---
 
-`vtype *lookup(mapof(ktype, vtype) **pptr, ktype key);`
+`vtype *lookup(pair(ktype, vtype) **pptr, ktype key);`
 
 Searches a data associated with a key.
 
