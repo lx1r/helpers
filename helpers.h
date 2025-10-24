@@ -203,9 +203,9 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
 	return ptr;
 }
 
-#define reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
-#define reserve1(pptr, len) reserve2(pptr, len, false)
-#define reserve0(pptr) reserve1(pptr, 32)
+#define ___reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
+#define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
+#define ___reserve0(pptr) ___reserve1(pptr, 32)
 
 /**
  * @fn type *reserve(type **pptr, size len, bool map = false);
@@ -220,7 +220,7 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
  * @return Pointer to the pre-allocated array.
  */
 #define reserve(pptr, ...)\
-	___apply(reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
+	___apply(___reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
 static inline size_t ___grow(size_t nb)
 {
