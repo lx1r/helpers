@@ -15,9 +15,12 @@ void add()
 	int key = xrand() & 0xffff;
 	int data = xrand() & 0xfff;
 	void *prev = ptr;
+	int *data_ref;
 
 	println("insert: key=", key, " data=", data);
-	insert(&ptr, key, data) ;
+	data_ref = insert(&ptr, key, data);
+	if (*data_ref != data)
+		println("add fail: ", *data_ref, "!=", data);
 	if (prev != ptr)
 		println("rehash: ", len(ptr));
 

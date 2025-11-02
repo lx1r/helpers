@@ -415,14 +415,15 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
  *
- * @return Index in the array where the new value is inserted or `-1`
- * if something went wrong, the index is valid until any method on the
- * associative array is called.
+ * @return Reference to the inserted data in the associative array or
+ * NULL if something went wrong. The reference is valid until any method
+ * on the associative array is called.
  */
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	___decl_hashfn(pair_.key, hashfn_);\
-	___insert((void **)pptr, &pair_, sizeof(pair_), sizeof((*(pptr))->key), hashfn_);\
+	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(pair_), sizeof((*(pptr))->key), hashfn_);\
+	slot_ != -1 ? &(*(pptr))[slot_].value : NULL;\
 })
 
 /**
