@@ -263,6 +263,7 @@ static inline size_t ___grow(size_t nb)
 	if (ptr_) {\
 		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
 		___meta(ptr_)->len = slot_ + 1;\
+		___meta(ptr_)->has_inuse = 0;\
 		*(pptr) = ptr_;\
 	} else {\
 		slot_ = -1;\
@@ -423,7 +424,7 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t
 	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	___decl_hashfn(pair_.key, hashfn_);\
 	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(pair_), sizeof((*(pptr))->key), hashfn_);\
-	slot_ != -1 ? &(*(pptr))[slot_].value : NULL;\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
 /**
