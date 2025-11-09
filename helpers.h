@@ -80,9 +80,39 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
-	size_t has_inuse:1;
 	size_t len:63;
+	size_t has_inuse:1;
 };
+
+
+
+struct meta_ext {
+	unsigned key_sz;
+	unsigned value_sz;
+};
+
+static inline struct meta *___meta_ext(struct meta *meta)
+{
+       return (void *)meta - sizeof(struct meta_ext);
+}
+
+static inline void *___key_offset(void *ptr, struct meta_ext *meta_ext)
+{
+	return ptr + ___align(meta_ext->value_sz, sizeof(size_t));
+}
+
+static inline void *___value_offset(void *ptr, struct meta_ext *meta_ext __attribute__((__unused__)))
+{
+	return ptr;
+}
+
+static inline size_t ___data_sz(struct meta_ext *meta_ext)
+{
+	return ___align(meta_ext->key_sz, sizeof(size_t)) +
+		___align(meta_ext->value_sz, sizeof(size_t));
+}
+
+
 
 static inline struct meta *___meta(void *ptr)
 {
@@ -203,7 +233,24 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
 	return ptr;
 }
 
-#define ___reserve2(pptr, len, map) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), map)
+static inline void *___reserve(size_t len, size_t data_sz, bool ext)
+{
+	void *ptr = malloc(data_sz*len + sizeof(struct meta) +
+			   ext ? sizeof(struct meta_ext) + ___inuse_sz(len): 0);
+	if (!ptr)
+		return NULL;
+
+	struct meta *meta = ___meta(ptr);
+	meta->has_inuse = ext;
+	meta->len = ext ? len : 0;
+
+	if (ext)
+		memset(___inuse_bits(meta), 0, ___inuse_sz(len));
+
+	return ptr;
+}
+
+#define ___reserve2(pptr, len, ext) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), ext)
 #define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
 #define ___reserve0(pptr) ___reserve1(pptr, 32)
 

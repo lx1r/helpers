@@ -56,6 +56,7 @@ void walk()
 
 int main()
 {
+	println("ALIGN(0)=", ___align(0, sizeof(unsigned long)));
 	println("ALIGN(1)=", ___align(1, sizeof(unsigned long)));
 	println("ALIGN_DOWN(1)=", ___align_down(1, sizeof(unsigned long)));
 	println("ALIGN_DOWN(", sizeof(unsigned long), ")=", ___align_down(sizeof(unsigned long), sizeof(unsigned long)));
@@ -70,6 +71,10 @@ int main()
 	insert(&ptr, 9, 19);
 	insert(&ptr, 11, 111);
 	walk();
+
+	size_t meta = *(size_t *)___meta(ptr);
+	println("meta=", (void*)meta);
+	println("len=", (void*)len(ptr));
 
 	reserve(&keys, 64);
 	reserve(&ptr, 64, true);
