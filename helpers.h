@@ -81,7 +81,7 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 
 struct meta {
 	size_t len:63;
-	size_t has_inuse:1;
+	size_t ext:1;
 };
 
 
@@ -121,7 +121,7 @@ static inline struct meta *___meta(void *ptr)
 
 static inline unsigned long *___inuse_bits(struct meta *meta)
 {
-	if (!meta->has_inuse)
+	if (!meta->ext)
 		return NULL;
 	return (void *)meta - ___inuse_sz(meta->len);
 }
@@ -134,7 +134,7 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
 	struct meta *meta = ___meta(ptr);
 
-	return !meta->has_inuse ||
+	return !meta->ext ||
 		___test_bit(slot, ___inuse_bits(meta));
 }
 
@@ -199,36 +199,34 @@ static inline void ___pvfree(void *pptr)
 	free(ptr);
 }
 
-static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
+static inline void *___extend(void *ptr, size_t len, size_t data_sz, bool ext)
 {
 	size_t prev_len = 0;
 	unsigned long *prev_inuse = NULL;
 	size_t prev_inuse_sz = 0;
 
-	if (!len)
-		return ptr;
-
 	if (ptr) {
 		struct meta *meta = ___meta(ptr);
-		has_inuse = meta->has_inuse;
+		ext = meta->ext;
 		prev_len = meta->len;
 		prev_inuse = ___inuse_bits(meta);
 		prev_inuse_sz = ___inuse_sz(prev_len);
 	}
 
-	ptr = realloc(ptr, sz*len + sizeof(struct meta) + (has_inuse ? ___inuse_sz(len) : 0));
+	ptr = realloc(ptr, data_sz*len + sizeof(struct meta) + (ext ? ___inuse_sz(len) : 0));
 	if (!ptr)
 		return NULL;
 
 	struct meta *meta = ___meta(ptr);
-	meta->has_inuse = has_inuse;
-	meta->len = has_inuse ? len : prev_len;
+	meta->ext = ext;
+	meta->len = ext ? len : prev_len;
 
-	unsigned long *inuse = ___inuse_bits(meta);
-	if (prev_inuse)
-		memmove(inuse, prev_inuse, prev_inuse_sz);
-	if (has_inuse)
+	if (ext) {
+		unsigned long *inuse = ___inuse_bits(meta);
+		if (prev_inuse)
+			memmove(inuse, prev_inuse, prev_inuse_sz);
 		memset(inuse + prev_inuse_sz, 0, ___inuse_sz(len) - prev_inuse_sz);
+	}
 
 	return ptr;
 }
@@ -236,12 +234,12 @@ static inline void *___extend(void *ptr, size_t len, size_t sz, bool has_inuse)
 static inline void *___reserve(size_t len, size_t data_sz, bool ext)
 {
 	void *ptr = malloc(data_sz*len + sizeof(struct meta) +
-			   ext ? sizeof(struct meta_ext) + ___inuse_sz(len): 0);
+			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(len) : 0));
 	if (!ptr)
 		return NULL;
 
 	struct meta *meta = ___meta(ptr);
-	meta->has_inuse = ext;
+	meta->ext = ext;
 	meta->len = ext ? len : 0;
 
 	if (ext)
@@ -269,7 +267,7 @@ static inline void *___reserve(size_t len, size_t data_sz, bool ext)
 #define reserve(pptr, ...)\
 	___apply(___reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
-static inline size_t ___grow(size_t nb)
+static inline size_t ___grow2(size_t nb)
 {
 	/* initial size */
 	if (!(nb & ~0x3f))
@@ -284,6 +282,11 @@ static inline size_t ___grow(size_t nb)
 	nb |= (nb >> 4);
 	nb |= (nb >> 8);
 	return nb + 1;
+}
+
+static inline size_t ___grow(size_t len)
+{
+	return len + (len * 1/1);
 }
 
 #define ___MALLOC_META sizeof(size_t)
@@ -304,13 +307,13 @@ static inline size_t ___grow(size_t nb)
  */
 #define append(pptr, ...) ({\
 	ssize_t slot_ = len(*(pptr));\
-	size_t new_sz_ = ___grow(___user_sz(*(pptr), slot_ + 1) + sizeof(struct meta) + \
+	size_t new_sz_ = ___grow2(___user_sz(*(pptr), slot_ + 1) + sizeof(struct meta) + \
 				 ___MALLOC_META) - ___MALLOC_META;\
 	typeof(*(pptr)) ptr_ = realloc(*(pptr), new_sz_);\
 	if (ptr_) {\
 		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
 		___meta(ptr_)->len = slot_ + 1;\
-		___meta(ptr_)->has_inuse = 0;\
+		___meta(ptr_)->ext = 0;\
 		*(pptr) = ptr_;\
 	} else {\
 		slot_ = -1;\
@@ -358,27 +361,27 @@ static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, siz
 	return -1;
 }
 
-static inline void *___rehash(void *ptr, size_t ext_cap, size_t pair_sz, size_t key_sz,
+static inline void *___rehash(void *ptr, size_t new_cap, size_t pair_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
-	if (!ext_cap) ext_cap = 32;
+	if (!new_cap) new_cap = 32;
 
-	void *ext_ptr = ___extend(NULL, ext_cap, pair_sz, true);
-	if (!ext_ptr)
+	void *new_ptr = ___reserve(new_cap, pair_sz, true);
+	if (!new_ptr)
 		return NULL;
 
 	for (size_t slot = 0; slot < cap; slot++) {
 		if (___inuse_test(ptr, slot)) {
-			ssize_t rc = ___try_insert(&ext_ptr, ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
+			ssize_t rc = ___try_insert(&new_ptr, ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
 			if (rc == -1) {
-				free(ext_ptr);
+				free(new_ptr);
 				return NULL;
 			}
 		}
 	}
 	free(ptr);
-	return ext_ptr;
+	return new_ptr;
 }
 
 static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
@@ -389,7 +392,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 		size_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
-		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
+		ptr = ___rehash(ptr, ___grow(len(ptr)), pair_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
