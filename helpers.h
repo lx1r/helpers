@@ -76,7 +76,6 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define zfree(ptr) ___zfree((void **)(ptr))
 
 #define ___cap(ptr)		(___align_down(malloc_usable_size(ptr), sizeof(size_t)))
-#define ___user_sz(ptr, len)	(___align((len) * sizeof(*(ptr)), sizeof(size_t)))
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
@@ -199,56 +198,24 @@ static inline void ___pvfree(void *pptr)
 	free(ptr);
 }
 
-static inline void *___extend(void *ptr, size_t len, size_t data_sz, bool ext)
+static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 {
-	size_t prev_len = 0;
-	unsigned long *prev_inuse = NULL;
-	size_t prev_inuse_sz = 0;
-
-	if (ptr) {
-		struct meta *meta = ___meta(ptr);
-		ext = meta->ext;
-		prev_len = meta->len;
-		prev_inuse = ___inuse_bits(meta);
-		prev_inuse_sz = ___inuse_sz(prev_len);
-	}
-
-	ptr = realloc(ptr, data_sz*len + sizeof(struct meta) + (ext ? ___inuse_sz(len) : 0));
+	void *ptr = malloc(data_sz*cap + sizeof(struct meta) +
+			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(cap) : 0));
 	if (!ptr)
 		return NULL;
 
 	struct meta *meta = ___meta(ptr);
+	meta->len = ext ? cap : 0;
 	meta->ext = ext;
-	meta->len = ext ? len : prev_len;
-
-	if (ext) {
-		unsigned long *inuse = ___inuse_bits(meta);
-		if (prev_inuse)
-			memmove(inuse, prev_inuse, prev_inuse_sz);
-		memset(inuse + prev_inuse_sz, 0, ___inuse_sz(len) - prev_inuse_sz);
-	}
-
-	return ptr;
-}
-
-static inline void *___reserve(size_t len, size_t data_sz, bool ext)
-{
-	void *ptr = malloc(data_sz*len + sizeof(struct meta) +
-			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(len) : 0));
-	if (!ptr)
-		return NULL;
-
-	struct meta *meta = ___meta(ptr);
-	meta->ext = ext;
-	meta->len = ext ? len : 0;
 
 	if (ext)
-		memset(___inuse_bits(meta), 0, ___inuse_sz(len));
+		memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
 
 	return ptr;
 }
 
-#define ___reserve2(pptr, len, ext) *(pptr) = ___extend(NULL, len, sizeof(*(*(pptr))), ext)
+#define ___reserve2(pptr, len, ext) *(pptr) = ___reserve(len, sizeof(**(pptr)), ext)
 #define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
 #define ___reserve0(pptr) ___reserve1(pptr, 32)
 
@@ -267,29 +234,19 @@ static inline void *___reserve(size_t len, size_t data_sz, bool ext)
 #define reserve(pptr, ...)\
 	___apply(___reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
-static inline size_t ___grow2(size_t nb)
-{
-	/* initial size */
-	if (!(nb & ~0x3f))
-		return 0x40;
-	/* align to page if large enought */
-	if (nb & ~0xfff)
-		return (nb + 0xfff) & ~0xfff;
-	/* otherwise align to power of 2 */
-	nb = nb - 1;
-	nb |= (nb >> 1);
-	nb |= (nb >> 2);
-	nb |= (nb >> 4);
-	nb |= (nb >> 8);
-	return nb + 1;
-}
 
-static inline size_t ___grow(size_t len)
+static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 {
-	return len + (len * 1/1);
-}
+	ptr = realloc(ptr, data_sz*len + sizeof(struct meta));
+	if (!ptr)
+		return NULL;
 
-#define ___MALLOC_META sizeof(size_t)
+	struct meta *meta = ___meta(ptr);
+	meta->len = len;
+	meta->ext = 0;
+
+	return ptr;
+}
 
 /**
  * @fn ssize_t append(type **pptr, type init);
@@ -307,13 +264,9 @@ static inline size_t ___grow(size_t len)
  */
 #define append(pptr, ...) ({\
 	ssize_t slot_ = len(*(pptr));\
-	size_t new_sz_ = ___grow2(___user_sz(*(pptr), slot_ + 1) + sizeof(struct meta) + \
-				 ___MALLOC_META) - ___MALLOC_META;\
-	typeof(*(pptr)) ptr_ = realloc(*(pptr), new_sz_);\
+	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
 	if (ptr_) {\
 		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
-		___meta(ptr_)->len = slot_ + 1;\
-		___meta(ptr_)->ext = 0;\
 		*(pptr) = ptr_;\
 	} else {\
 		slot_ = -1;\
@@ -392,7 +345,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 		size_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
-		ptr = ___rehash(ptr, ___grow(len(ptr)), pair_sz, key_sz, hashfn);
+		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
