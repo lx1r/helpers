@@ -314,26 +314,26 @@ static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, siz
 	return -1;
 }
 
-static inline void *___rehash(void *ptr, size_t new_cap, size_t pair_sz, size_t key_sz,
+static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
-	size_t cap = len(ptr);
+	size_t old_cap = len(old_ptr);
 	if (!new_cap) new_cap = 32;
 
 	void *new_ptr = ___reserve(new_cap, pair_sz, true);
 	if (!new_ptr)
 		return NULL;
 
-	for (size_t slot = 0; slot < cap; slot++) {
-		if (___inuse_test(ptr, slot)) {
-			ssize_t rc = ___try_insert(&new_ptr, ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
+	for (size_t slot = 0; slot < old_cap; slot++) {
+		if (___inuse_test(old_ptr, slot)) {
+			ssize_t rc = ___try_insert(&new_ptr, old_ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(new_ptr);
 				return NULL;
 			}
 		}
 	}
-	free(ptr);
+	free(old_ptr);
 	return new_ptr;
 }
 
