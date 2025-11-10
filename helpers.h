@@ -83,8 +83,7 @@ struct meta {
 	size_t ext:1;
 };
 
-
-
+#if 0
 struct meta_ext {
 	unsigned key_sz;
 	unsigned value_sz;
@@ -110,8 +109,7 @@ static inline size_t ___data_sz(struct meta_ext *meta_ext)
 	return ___align(meta_ext->key_sz, sizeof(size_t)) +
 		___align(meta_ext->value_sz, sizeof(size_t));
 }
-
-
+#endif
 
 static inline struct meta *___meta(void *ptr)
 {
@@ -220,14 +218,14 @@ static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 #define ___reserve0(pptr) ___reserve1(pptr, 32)
 
 /**
- * @fn type *reserve(type **pptr, size len, bool map = false);
+ * @fn type *reserve(type **pptr, size len, bool ext = false);
  *
  * @brief Pre-allocates memory for an array.
  *
  * @param pptr pointer to the dynamic or associative array,
  * may be any type
  * @param len pre-allocated items count
- * @param map if true preallocate memory for an associative array
+ * @param ext if true preallocate memory for an associative array
  *
  * @return Pointer to the pre-allocated array.
  */

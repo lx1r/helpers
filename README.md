@@ -32,14 +32,14 @@ an associative array.
 
 ---
 
-`type *reserve(type **pptr, size len, bool map = false);`
+`type *reserve(type **pptr, size len, bool ext = false);`
 
 Pre-allocates memory for an array.
 
 * `pptr` -  pointer to the dynamic or associative array,
 may be any type
 * `len` -  pre-allocated items count
-* `map` -  if true preallocate memory for an associative array
+* `ext` -  if true preallocate memory for an associative array
 
 **Returns:** Pointer to the pre-allocated array.
 
