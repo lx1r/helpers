@@ -237,9 +237,14 @@ static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 
 static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 {
-	ptr = realloc(ptr, data_sz*len + sizeof(struct meta));
-	if (!ptr)
-		return NULL;
+	size_t cap = ptr ? (___cap(ptr) - sizeof(struct meta)) / data_sz : 0;
+
+	if (len > cap) {
+		cap = cap ? cap + cap/4 : 32;
+		ptr = realloc(ptr, data_sz*cap + sizeof(struct meta));
+		if (!ptr)
+			return NULL;
+	}
 
 	struct meta *meta = ___meta(ptr);
 	meta->len = len;
