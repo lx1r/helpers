@@ -79,7 +79,7 @@ static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
-	size_t len:63;
+	size_t len:__SIZE_WIDTH__ - 1;
 	size_t ext:1;
 };
 
