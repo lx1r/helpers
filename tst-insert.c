@@ -86,7 +86,7 @@ int main()
 
 	___lookup_probes = 0;
 	foreach (it, keys) find(*it);
-	println("probes per lookup: ", ___lookup_probes/(double)len(keys));
+	println("probes per lookup: ", ___lookup_probes/(double)___lookups);
 
 	del(7);
 

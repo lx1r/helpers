@@ -67,6 +67,7 @@
  * predefined functions: `close`, `fclose`, `free`, `vfree`.
  */
 #define defer(func) __attribute__((__cleanup__(___p##func)))
+
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
@@ -91,7 +92,7 @@ struct meta_ext {
 
 static inline struct meta *___meta_ext(struct meta *meta)
 {
-       return (void *)meta - sizeof(struct meta_ext);
+	return (void *)meta - sizeof(struct meta_ext);
 }
 #endif
 
@@ -153,6 +154,13 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 		 typeof(*(ptr)) **: ___dynamic_len, \
 		 default: ___builtin_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
+#define ___foreach0(ref, ptr) \
+	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
+	if (___inuse(ptr, (ref) - (ptr)))
+
+#define ___foreach1(ref, ptr, n) \
+	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
+
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
@@ -164,9 +172,6 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
  * @param len number of elements to iterate, default is `len(ptr)`
  *
  */
-#define ___foreach0(ref, ptr) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) if (___inuse(ptr, (ref) - (ptr)))
-#define ___foreach1(ref, ptr, n) for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
-
 #define foreach(ref, ptr, ...) \
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
 
@@ -313,7 +318,8 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 
 	for (ssize_t slot = 0; slot < old_cap; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t rc = ___try_insert(&new_ptr, old_ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
+			ssize_t rc = ___try_insert(&new_ptr, old_ptr + slot*pair_sz,
+						   pair_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(new_ptr);
 				return NULL;
@@ -343,8 +349,8 @@ static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
 static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz,
-			      unsigned long (*hashfn)(const void *, size_t),
-			      int (*cmprfn)(const void *, const void *, size_t))
+				unsigned long (*hashfn)(const void *, size_t),
+				int (*cmprfn)(const void *, const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
