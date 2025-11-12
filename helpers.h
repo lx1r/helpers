@@ -75,7 +75,7 @@ static inline void *zalloc(size_t size) { return calloc(1, size); }
 static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
 #define zfree(ptr) ___zfree((void **)(ptr))
 
-#define ___cap(ptr)		(___align_down(malloc_usable_size(ptr), sizeof(size_t)))
+#define ___cap_sz(ptr)		malloc_usable_size(ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 
 struct meta {
@@ -86,34 +86,18 @@ struct meta {
 #if 0
 struct meta_ext {
 	unsigned key_sz;
-	unsigned value_sz;
+	unsigned key_off;
 };
 
 static inline struct meta *___meta_ext(struct meta *meta)
 {
        return (void *)meta - sizeof(struct meta_ext);
 }
-
-static inline void *___key_offset(void *ptr, struct meta_ext *meta_ext)
-{
-	return ptr + ___align(meta_ext->value_sz, sizeof(size_t));
-}
-
-static inline void *___value_offset(void *ptr, struct meta_ext *meta_ext __attribute__((__unused__)))
-{
-	return ptr;
-}
-
-static inline size_t ___data_sz(struct meta_ext *meta_ext)
-{
-	return ___align(meta_ext->key_sz, sizeof(size_t)) +
-		___align(meta_ext->value_sz, sizeof(size_t));
-}
 #endif
 
 static inline struct meta *___meta(void *ptr)
 {
-	return ptr + ___cap(ptr) - sizeof(struct meta);
+	return ptr + ___cap_sz(ptr) - sizeof(struct meta);
 }
 
 static inline unsigned long *___inuse_bits(struct meta *meta)
@@ -235,7 +219,7 @@ static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 
 static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 {
-	size_t cap = ptr ? (___cap(ptr) - sizeof(struct meta)) / data_sz : 0;
+	size_t cap = ptr ? (___cap_sz(ptr) - sizeof(struct meta)) / data_sz : 0;
 
 	if (len > cap) {
 		cap = cap ? cap + cap/4 : 32;
@@ -307,7 +291,7 @@ static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, siz
 	unsigned long hash = hashfn(pair, key_sz);
 
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-		size_t slot = (hash + i) % cap;
+		ssize_t slot = (hash + i) % cap;
 		if (!___inuse_test(ptr, slot)) {
 			memcpy(ptr + slot*pair_sz, pair, pair_sz);
 			___inuse_set(ptr, slot);
@@ -327,7 +311,7 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 	if (!new_ptr)
 		return NULL;
 
-	for (size_t slot = 0; slot < old_cap; slot++) {
+	for (ssize_t slot = 0; slot < old_cap; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
 			ssize_t rc = ___try_insert(&new_ptr, old_ptr + slot*pair_sz, pair_sz, key_sz, hashfn);
 			if (rc == -1) {
@@ -345,7 +329,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 {
 	void *ptr = *pptr;
 	do {
-		size_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
+		ssize_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
 		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
@@ -355,9 +339,10 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 	return -1;
 }
 
+static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
-static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz, size_t val_off,
+static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t),
 			      int (*cmprfn)(const void *, const void *, size_t))
 {
@@ -365,14 +350,15 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t
 	size_t cap = len(ptr);
 	unsigned long hash = hashfn(key_ptr, key_sz);
 
+	___lookups++;
 	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-		size_t slot = (hash + i) % cap;
+		ssize_t slot = (hash + i) % cap;
 		___lookup_probes++;
-		if (___inuse_test(ptr, slot) && cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0) {
-			return ptr + slot*pair_sz + val_off;
-		}
+		if (___inuse_test(ptr, slot))
+			if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
+				return slot;
 	}
-	return NULL;
+	return -1;
 }
 
 #define ___decl_hashfn(key, func_name) \
@@ -429,7 +415,8 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	___decl_hashfn(pair_.key, hashfn_);\
-	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(pair_), sizeof((*(pptr))->key), hashfn_);\
+	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
+				  sizeof((*(pptr))->key), hashfn_);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
@@ -469,8 +456,9 @@ static inline void *___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t
 	typeof((*(pptr))->key) key_ = k;\
 	___decl_hashfn(key_, hashfn_);\
 	___decl_cmprfn(key_, cmprfn_);\
-	___lookup((void **)pptr, &key_, sizeof(**(pptr)), sizeof((*(pptr))->key), \
-		  ___value_offset(*(pptr)), hashfn_, cmprfn_);\
+	ssize_t slot_ = ___lookup((void **)pptr, &key_, sizeof(**(pptr)), \
+				  sizeof((*(pptr))->key), hashfn_, cmprfn_);\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
 #define ___fill_pr_fmt(ptr, x)\
