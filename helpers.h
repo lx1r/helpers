@@ -532,7 +532,7 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 })
 
 /**
- * @fn int print(FILE *fp, ...);
+ * @fn int print(...);
  *
  * @brief Prints a list of values into the standard output stream.
  *

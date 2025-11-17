@@ -130,7 +130,7 @@ Prints a list of values into a stream.
 
 ---
 
-`int print(FILE *fp, ...);`
+`int print(...);`
 
 Prints a list of values into the standard output stream.
 
