@@ -112,30 +112,17 @@ static inline unsigned long *___inuse_bits(struct meta *meta)
 #define ___inuse_set(ptr, slot)		___set_bit(slot, ___inuse_bits(___meta(ptr)))
 #define ___inuse_clear(ptr, slot)	___clear_bit(slot, ___inuse_bits(___meta(ptr)))
 
+#define ___inuse(ptr, slot) \
+	_Generic(&(ptr), \
+		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot), \
+		 default: true)
+
 static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
 	struct meta *meta = ___meta(ptr);
 
 	return !meta->ext ||
 		___test_bit(slot, ___inuse_bits(meta));
-}
-
-#define ___inuse(ptr, slot) \
-	_Generic(&(ptr), \
-		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot), \
-		 default: true)
-
-static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
-{
-	return n / c;
-}
-
-static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
-				    size_t n __attribute__((__unused__)))
-{
-	if (!ptr)
-		return 0;
-	return ___meta(ptr)->len;
 }
 
 /**
@@ -154,12 +141,28 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 		 typeof(*(ptr)) **: ___dynamic_len, \
 		 default: ___builtin_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
-#define ___foreach0(ref, ptr) \
-	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
-	if (___inuse(ptr, (ref) - (ptr)))
+static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+{
+	return n / c;
+}
 
-#define ___foreach1(ref, ptr, n) \
-	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
+static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
+				    size_t n __attribute__((__unused__)))
+{
+	if (!ptr)
+		return 0;
+	return ___meta(ptr)->len;
+}
+
+static inline void ___pvfree(void *pptr)
+{
+	void **ptr = *(void ***)pptr;
+	size_t n = len(ptr);
+
+	for (size_t i = 0; i < n; i++)
+		free(ptr[i]);
+	free(ptr);
+}
 
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
@@ -175,36 +178,12 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 #define foreach(ref, ptr, ...) \
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
 
-static inline void ___pvfree(void *pptr)
-{
-	void **ptr = *(void ***)pptr;
-	size_t n = len(ptr);
+#define ___foreach0(ref, ptr) \
+	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
+	if (___inuse(ptr, (ref) - (ptr)))
 
-	for (size_t i = 0; i < n; i++)
-		free(ptr[i]);
-	free(ptr);
-}
-
-static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
-{
-	void *ptr = malloc(data_sz*cap + sizeof(struct meta) +
-			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(cap) : 0));
-	if (!ptr)
-		return NULL;
-
-	struct meta *meta = ___meta(ptr);
-	meta->len = ext ? cap : 0;
-	meta->ext = ext;
-
-	if (ext)
-		memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
-
-	return ptr;
-}
-
-#define ___reserve2(pptr, len, ext) *(pptr) = ___reserve(len, sizeof(**(pptr)), ext)
-#define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
-#define ___reserve0(pptr) ___reserve1(pptr, 32)
+#define ___foreach1(ref, ptr, n) \
+	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
 
 /**
  * @fn type *reserve(type **pptr, size len, bool ext = false);
@@ -221,21 +200,23 @@ static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 #define reserve(pptr, ...)\
 	___apply(___reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
+#define ___reserve2(pptr, len, ext) *(pptr) = ___reserve(len, sizeof(**(pptr)), ext)
+#define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
+#define ___reserve0(pptr) ___reserve1(pptr, 32)
 
-static inline void *___extend(void *ptr, size_t len, size_t data_sz)
+static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 {
-	size_t cap = ptr ? (___cap_sz(ptr) - sizeof(struct meta)) / data_sz : 0;
-
-	if (len > cap) {
-		cap = cap ? cap + cap/4 : 32;
-		ptr = realloc(ptr, data_sz*cap + sizeof(struct meta));
-		if (!ptr)
-			return NULL;
-	}
+	void *ptr = malloc(data_sz*cap + sizeof(struct meta) +
+			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(cap) : 0));
+	if (!ptr)
+		return NULL;
 
 	struct meta *meta = ___meta(ptr);
-	meta->len = len;
-	meta->ext = 0;
+	meta->len = ext ? cap : 0;
+	meta->ext = ext;
+
+	if (ext)
+		memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
 
 	return ptr;
 }
@@ -266,6 +247,38 @@ static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 	slot_;\
 })
 
+static inline void *___extend(void *ptr, size_t len, size_t data_sz)
+{
+	size_t cap = ptr ? (___cap_sz(ptr) - sizeof(struct meta)) / data_sz : 0;
+
+	if (len > cap) {
+		cap = cap ? cap + cap/4 : 32;
+		ptr = realloc(ptr, data_sz*cap + sizeof(struct meta));
+		if (!ptr)
+			return NULL;
+	}
+
+	struct meta *meta = ___meta(ptr);
+	meta->len = len;
+	meta->ext = 0;
+
+	return ptr;
+}
+
+/**
+ * @fn pair(ktype, vtype)
+ *
+ * @brief Associative array element type.
+ *
+ * @param ktype associative array index (key) type, can be any non-pointer
+ * type except a pointer to a null terminated string
+ * @param vtype a type of value associated with the key, can be any type
+ *
+ * To pass associative array pointers to functions, the associative array type
+ * must be fully qualified using the `typedef` keyword.
+ */
+#define pair(ktype, vtype) struct { ktype key; vtype value; }
+
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
 	unsigned long hash = 14695981039346656037UL;
 	for (int i = 0; i < len; i++) {
@@ -284,9 +297,52 @@ static inline unsigned long ___hnv1az(const char *key) {
 	return hash;
 }
 
+#define ___decl_hashfn(key, func_name) \
+	unsigned long func_name(const void *key_ptr, size_t key_sz) {\
+		return _Generic(key,\
+				char *:		___hnv1az(*(char **)key_ptr),\
+				const char *:	___hnv1az(*(char **)key_ptr),\
+				default:	___hnv1a(key_ptr, key_sz));\
+	}
+
+#define ___decl_cmprfn(key, func_name) \
+	int func_name(const void *lhs, const void *rhs, size_t sz) {\
+		return _Generic(key,\
+				char *:		strcmp(*(char **)lhs, *(char **)rhs),\
+				const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
+				default:	memcmp(lhs, rhs, sz));\
+	}
+
 #ifndef ___PROBE_STEP
 #define ___PROBE_STEP 5
 #endif
+
+/**
+ * @fn ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);
+ *
+ * @brief Adds an element to a dynamic associative array, expands memory
+ * usage if necessary.
+ *
+ * If an element with the same key exists, a duplicate element will be
+ * added, to prevent this, the `lookup` method should be used.
+ *
+ * @param pptr pointer to the associative array, may be declared using
+ * `pair` macro
+ * @param key associative array index value, maybe any standard type
+ * @param init initializer for a new data element, may be an aggregate
+ * initializer list
+ *
+ * @return Reference to the inserted data in the associative array or
+ * NULL if something went wrong. The reference is valid until any method
+ * on the associative array is called.
+ */
+#define insert(pptr, k, ...) ({\
+	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+	___decl_hashfn(pair_.key, hashfn_);\
+	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
+				  sizeof((*(pptr))->key), hashfn_);\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+})
 
 static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
@@ -345,87 +401,6 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 	return -1;
 }
 
-static size_t ___lookups = 0;
-static size_t ___lookup_probes = 0;
-
-static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz,
-				unsigned long (*hashfn)(const void *, size_t),
-				int (*cmprfn)(const void *, const void *, size_t))
-{
-	void *ptr = *pptr;
-	size_t cap = len(ptr);
-	unsigned long hash = hashfn(key_ptr, key_sz);
-
-	___lookups++;
-	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-		ssize_t slot = (hash + i) % cap;
-		___lookup_probes++;
-		if (___inuse_test(ptr, slot))
-			if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
-				return slot;
-	}
-	return -1;
-}
-
-#define ___decl_hashfn(key, func_name) \
-	unsigned long func_name(const void *key_ptr, size_t key_sz) {\
-		return _Generic(key,\
-				char *:		___hnv1az(*(char **)key_ptr),\
-				const char *:	___hnv1az(*(char **)key_ptr),\
-				default:	___hnv1a(key_ptr, key_sz));\
-	}
-
-#define ___decl_cmprfn(key, func_name) \
-	int func_name(const void *lhs, const void *rhs, size_t sz) {\
-		return _Generic(key,\
-				char *:		strcmp(*(char **)lhs, *(char **)rhs),\
-				const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
-				default:	memcmp(lhs, rhs, sz));\
-	}
-
-#define ___value_offset(ptr) ((void *)&(ptr)->value - (void *)(ptr))
-
-/**
- * @fn pair(ktype, vtype)
- *
- * @brief Associative array element type.
- *
- * @param ktype associative array index (key) type, can be any non-pointer
- * type except a pointer to a null terminated string
- * @param vtype a type of value associated with the key, can be any type
- *
- * To pass associative array pointers to functions, the associative array type
- * must be fully qualified using the `typedef` keyword.
- */
-#define pair(ktype, vtype) struct { ktype key; vtype value; }
-
-/**
- * @fn ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);
- *
- * @brief Adds an element to a dynamic associative array, expands memory
- * usage if necessary.
- *
- * If an element with the same key exists, a duplicate element will be
- * added, to prevent this, the `lookup` method should be used.
- *
- * @param pptr pointer to the associative array, may be declared using
- * `pair` macro
- * @param key associative array index value, maybe any standard type
- * @param init initializer for a new data element, may be an aggregate
- * initializer list
- *
- * @return Reference to the inserted data in the associative array or
- * NULL if something went wrong. The reference is valid until any method
- * on the associative array is called.
- */
-#define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	___decl_hashfn(pair_.key, hashfn_);\
-	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
-				  sizeof((*(pptr))->key), hashfn_);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
-})
-
 /**
  * @fn ssize_t delete(pair(ktype, vtype) **pptr, vtype *ref);
  *
@@ -439,12 +414,22 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
  * the index is valid until any associative array method is called.
  */
 #define delete(pptr, ref) ({\
-	typeof(*(pptr)) ptr_ = *(pptr);\
-	typeof(*(pptr)) slot_ptr_ = (void *)(ref) - ___value_offset(ptr_);\
-	ssize_t slot_ = slot_ptr_ - ptr_;\
-	___inuse_clear(ptr_, slot_);\
-	slot_;\
+	___delete((void **)pptr, ref, sizeof(**(pptr)));\
 })
+
+static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz)
+{
+	void *ptr = *pptr;
+	size_t cap = len(ptr);
+
+	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / pair_sz;
+
+	if (slot < 0 || slot >= cap)
+		return -1;
+	___inuse_clear(ptr, slot);
+
+	return slot;
+}
 
 /**
  * @fn vtype *lookup(pair(ktype, vtype) **pptr, ktype key);
@@ -466,6 +451,28 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 				  sizeof((*(pptr))->key), hashfn_, cmprfn_);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
+
+static size_t ___lookups = 0;
+static size_t ___lookup_probes = 0;
+
+static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz,
+				unsigned long (*hashfn)(const void *, size_t),
+				int (*cmprfn)(const void *, const void *, size_t))
+{
+	void *ptr = *pptr;
+	size_t cap = len(ptr);
+	unsigned long hash = hashfn(key_ptr, key_sz);
+
+	___lookups++;
+	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
+		ssize_t slot = (hash + i) % cap;
+		___lookup_probes++;
+		if (___inuse_test(ptr, slot))
+			if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
+				return slot;
+	}
+	return -1;
+}
 
 #define ___fill_pr_fmt(ptr, x)\
 	_Generic(x,\
@@ -506,6 +513,16 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 #define ___fill_fmt(ptr, ...)\
 	___apply(___fill_fmt, ___narg(__VA_ARGS__))(ptr, __VA_ARGS__)
 
+/**
+ * @fn int fprint(FILE *fp, ...);
+ *
+ * @brief Prints a list of values into a stream.
+ *
+ * @param fp output stream
+ * @param ... list of values or constants of standard type to print
+ *
+ * @return The number of bytes printed.
+ */
 #define fprint(fp, ...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
 	char *dst_ = fmt_;\
@@ -514,6 +531,15 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	fprintf(fp, fmt_, ##__VA_ARGS__);\
 })
 
+/**
+ * @fn int print(FILE *fp, ...);
+ *
+ * @brief Prints a list of values into the standard output stream.
+ *
+ * @param ... list of values or constants of standard type to print
+ *
+ * @return The number of bytes printed.
+ */
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
 /**
@@ -546,28 +572,38 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
-#define ___printv(fp, sep, ptr, len) ({\
+/**
+ * @fn int fprintv(FILE *fp, const char *sep, type *ptr, size_t len = len(ptr));
+ *
+ * @brief Print an array to a stream.
+ *
+ * @param fp output stream
+ * @param sep separator between elements of the output array
+ * @param ptr array of values or constants of standard type to print
+ * @param len number of elements to output, default is `len()`
+ *
+ * @return The number of bytes printed.
+ */
+#define fprintv(fp, sep, ptr, ...)\
+	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, ptr, ##__VA_ARGS__)
+
+#define fprintv1(fp, sep, ptr, len) ___fprintv(fp, sep, ptr, len)
+#define fprintv0(fp, sep, ptr) fprintv1(fp, sep, ptr, len(ptr))
+
+#define ___fprintv(fp, sep, ptr, len) ({\
 	int nb_ = 0;\
-	size_t len_ = (len);\
-	const char *sep_ = "";\
+	size_t len_ = len;\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
 	typeof(ptr) *pptr_ = &(ptr);\
-	___fill_pr_fmt(dst_, sep_);\
+	___fill_pr_fmt(dst_, "");\
 	___fill_pr_fmt(dst_, **pptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += fprintf(fp, fmt_, sep_, (*pptr_)[i_]);\
-		if (i_ == 0) sep_ = (sep);\
+		nb_ += fprintf(fp, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
 	}\
 	nb_;\
 })
-
-#define fprintv1(fp, sep, ptr, len) ___printv(fp, sep, ptr, len)
-#define fprintv0(fp, sep, ptr) fprintv1(fp, sep, ptr, len(ptr))
-
-#define fprintv(fp, sep, ptr, ...)\
-	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, ptr, ##__VA_ARGS__)
 
 /**
  * @fn int printv(const char *sep, type *ptr, size_t len = len(ptr));
@@ -585,7 +621,7 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 /**
  * @fn char *join(...);
  *
- * @brief Concatenates an list of values into a single string.
+ * @brief Concatenates a list of values into a single string.
  *
  * @param ... list of values or constants of standard type to join
  *
@@ -602,33 +638,6 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	buf_;\
 })
 
-#define ___joinv(sep, ptr, len) ({\
-	int nb_ = 0;\
-	size_t len_ = (len);\
-	const char *sep_ = "";\
-	char fmt_[4 + 2 + 1];\
-	char *dst_ = fmt_;\
-	typeof(ptr) *pptr_ = &(ptr);\
-	___fill_pr_fmt(dst_, sep_);\
-	___fill_pr_fmt(dst_, **pptr_);\
-	*dst_ = '\0';\
-	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += snprintf(NULL, 0, fmt_, sep_, (*pptr_)[i_]);\
-		if (i_ == 0) sep_ = (sep);\
-	}\
-	char *buf_ = malloc(nb_ + 1);\
-	nb_ = 0;\
-	sep_ = "";\
-	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += sprintf(buf_ + nb_, fmt_, sep_, (*pptr_)[i_]);\
-		if (i_ == 0) sep_ = (sep);\
-	}\
-	buf_;\
-})
-
-#define joinv1(sep, ptr, len) ___joinv(sep, ptr, len)
-#define joinv0(sep, ptr) joinv1(sep, ptr, len(ptr))
-
 /**
  * @fn char *joinv(const char *sep, type *ptr, size_t len = len(ptr));
  *
@@ -642,6 +651,35 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
  */
 #define joinv(sep, ptr, ...)\
 	___apply(joinv, ___narg(__VA_ARGS__))(sep, ptr, ##__VA_ARGS__)
+
+#define joinv1(sep, ptr, len) ___joinv(sep, ptr, len)
+#define joinv0(sep, ptr) joinv1(sep, ptr, len(ptr))
+
+#define ___joinv(sep, ptr, len) ({\
+	int nb_ = 0;\
+	size_t len_ = len;\
+	char fmt_[4 + 2 + 1];\
+	char *dst_ = fmt_;\
+	typeof(ptr) *pptr_ = &(ptr);\
+	___fill_pr_fmt(dst_, "");\
+	___fill_pr_fmt(dst_, **pptr_);\
+	*dst_ = '\0';\
+	for (size_t i_ = 0; i_ < len_; i_++) {\
+		nb_ += snprintf(NULL, 0, fmt_, i ? sep : "", (*pptr_)[i_]);\
+	}\
+	char *buf_ = malloc(nb_ + 1);\
+	nb_ = 0;\
+	for (size_t i_ = 0; i_ < len_; i_++) {\
+		nb_ += sprintf(buf_ + nb_, fmt_, i ? sep : "", (*pptr_)[i_]);\
+	}\
+	buf_;\
+})
+
+#define ___get_val(str, sep, next, p) ({\
+	char *tok_ = ___get_tok(str, sep, &next);\
+	*(p) = ___from_str(tok_, *(p));\
+	free(tok_);\
+})
 
 static inline char *___get_tok(const char *str, const char *sep, const char **next)
 {
@@ -689,25 +727,6 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 		 char *:		strdup(str_)) : 0;\
 })
 
-#define ___get_val(str, sep, next, p) ({\
-	char *tok_ = ___get_tok(str, sep, &next);\
-	*(p) = ___from_str(tok_, *(p));\
-	free(tok_);\
-})
-
-#define ___split1(sep, next)
-#define ___split2(sep, next, p) ___get_val(NULL, sep, next, p)
-#define ___split3(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split2(sep, next, __VA_ARGS__)
-#define ___split4(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split3(sep, next, __VA_ARGS__)
-#define ___split5(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split4(sep, next, __VA_ARGS__)
-#define ___split6(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split5(sep, next, __VA_ARGS__)
-#define ___split7(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split6(sep, next, __VA_ARGS__)
-#define ___split8(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split7(sep, next, __VA_ARGS__)
-#define ___split9(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split8(sep, next, __VA_ARGS__)
-#define ___split10(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split9(sep, next, __VA_ARGS__)
-#define ___split11(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split10(sep, next, __VA_ARGS__)
-#define ___split12(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split11(sep, next, __VA_ARGS__)
-
 /**
  * @fn void split(const char *str, const char *sep, ...);
  *
@@ -729,6 +748,19 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	___apply(___split, ___narg(p, ##__VA_ARGS__))(sep, next_, ##__VA_ARGS__);\
 })
 
+#define ___split1(sep, next)
+#define ___split2(sep, next, p) ___get_val(NULL, sep, next, p)
+#define ___split3(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split2(sep, next, __VA_ARGS__)
+#define ___split4(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split3(sep, next, __VA_ARGS__)
+#define ___split5(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split4(sep, next, __VA_ARGS__)
+#define ___split6(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split5(sep, next, __VA_ARGS__)
+#define ___split7(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split6(sep, next, __VA_ARGS__)
+#define ___split8(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split7(sep, next, __VA_ARGS__)
+#define ___split9(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split8(sep, next, __VA_ARGS__)
+#define ___split10(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split9(sep, next, __VA_ARGS__)
+#define ___split11(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split10(sep, next, __VA_ARGS__)
+#define ___split12(sep, next, p, ...) ___get_val(NULL, sep, next, p); ___split11(sep, next, __VA_ARGS__)
+
 /**
  * @fn void splitv(const char *str, const char *sep, type **pptr);
  *
@@ -749,6 +781,9 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	}\
 })
 
+#define func(args, expr)\
+	({ typeof(({ ___apply(___decl, ___narg args) args expr; })) ___func args { return expr; } ___func; })
+
 #define ___decl1(x) x;
 #define ___decl2(x, ...) x; ___decl1(__VA_ARGS__)
 #define ___decl3(x, ...) x; ___decl2(__VA_ARGS__)
@@ -761,9 +796,6 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___decl10(x, ...) x; ___decl9(__VA_ARGS__)
 #define ___decl11(x, ...) x; ___decl10(__VA_ARGS__)
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
-
-#define func(args, expr)\
-	({ typeof(({ ___apply(___decl, ___narg args) args expr; })) ___func args { return expr; } ___func; })
 
 #define map(fn, lt) ({\
 	typeof(&(*(lt))) ret_ = NULL;\
