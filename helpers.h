@@ -665,12 +665,12 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	___fill_pr_fmt(dst_, **pptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += snprintf(NULL, 0, fmt_, i ? sep : "", (*pptr_)[i_]);\
+		nb_ += snprintf(NULL, 0, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
 	}\
 	char *buf_ = malloc(nb_ + 1);\
 	nb_ = 0;\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += sprintf(buf_ + nb_, fmt_, i ? sep : "", (*pptr_)[i_]);\
+		nb_ += sprintf(buf_ + nb_, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
 	}\
 	buf_;\
 })

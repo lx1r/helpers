@@ -119,6 +119,27 @@ if the key doesn't exist NULL pointer will be returned.
 
 ---
 
+`int fprint(FILE *fp, ...);`
+
+Prints a list of values into a stream.
+
+* `fp` -  output stream
+* `` - ... list of values or constants of standard type to print
+
+**Returns:** The number of bytes printed.
+
+---
+
+`int print(FILE *fp, ...);`
+
+Prints a list of values into the standard output stream.
+
+* `` - ... list of values or constants of standard type to print
+
+**Returns:** The number of bytes printed.
+
+---
+
 `int fprintln(FILE *fp, ...);`
 
 Prints a line to a stream.
@@ -140,6 +161,19 @@ Prints a line to the standard output stream.
 
 ---
 
+`int fprintv(FILE *fp, const char *sep, type *ptr, size_t len = len(ptr));`
+
+Print an array to a stream.
+
+* `fp` -  output stream
+* `sep` -  separator between elements of the output array
+* `ptr` -  array of values or constants of standard type to print
+* `len` -  number of elements to output, default is `len()`
+
+**Returns:** The number of bytes printed.
+
+---
+
 `int printv(const char *sep, type *ptr, size_t len = len(ptr));`
 
 Print an array to the standard output stream.
@@ -154,7 +188,7 @@ Print an array to the standard output stream.
 
 `char *join(...);`
 
-Concatenates an list of values into a single string.
+Concatenates a list of values into a single string.
 
 * `` - ... list of values or constants of standard type to join
 
