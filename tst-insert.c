@@ -89,6 +89,8 @@ int main()
 	println("probes per lookup: ", ___lookup_probes/(double)___lookups);
 
 	del(7);
+	foreach (it, keys) if ((xrand() & 0xf) == 1) del(*it);
+	walk();
 
 	return 0;
 }

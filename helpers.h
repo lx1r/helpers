@@ -410,8 +410,9 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
  * @param ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
  *
- * @return Index in the array that `ref` belonged to,
+ * @return Index in the dynamic array that `ref` belonged to,
  * the index is valid until any associative array method is called.
+ * `-1` is returned if `ref` in invalid.
  */
 #define delete(pptr, ref) ({\
 	___delete((void **)pptr, ref, sizeof(**(pptr)));\
