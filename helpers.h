@@ -84,18 +84,6 @@ struct meta {
 	size_t ext:1;
 };
 
-#if 0
-struct meta_ext {
-	unsigned key_sz;
-	unsigned key_off;
-};
-
-static inline struct meta *___meta_ext(struct meta *meta)
-{
-	return (void *)meta - sizeof(struct meta_ext);
-}
-#endif
-
 static inline struct meta *___meta(void *ptr)
 {
 	return ptr + ___cap_sz(ptr) - sizeof(struct meta);
