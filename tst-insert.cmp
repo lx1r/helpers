@@ -1,8 +1,8 @@
-ALIGN(0)=0
-ALIGN(1)=8
-ALIGN_DOWN(1)=0
-ALIGN_DOWN(8)=8
-ALIGN_DOWN(40)=40
+align(0)=0
+align(1)=8
+align_down(1)=0
+align_down(8)=8
+align_down(40)=40
 lookup: key=7 not found
 len=32
 slot=2 key=7 data=17
@@ -4023,3 +4023,30 @@ slot=2038 key=11809 data=1575
 slot=2041 key=34303 data=2050
 slot=2046 key=9472 data=2880
 slot=2047 key=170 data=1338
+initial months
+months: len=12 cap=32
+ september: 9
+ november: 11
+ june: 6
+ may: 5
+ october: 10
+ march: 3
+ february: 2
+ april: 4
+ august: 8
+ january: 1
+ december: 12
+ july: 7
+found: 8
+node not found
+del except: october, november, december
+months: len=3 cap=32
+ november: 11
+ october: 10
+ december: 12
+add trillium
+months: len=4 cap=32
+ november: 11
+ october: 10
+ trillium: 14
+ december: 12
