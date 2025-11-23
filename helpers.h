@@ -285,21 +285,20 @@ static inline unsigned long ___hnv1az(const char *key) {
 	return hash;
 }
 
-#define ___hash_func(key, func_name) \
-	unsigned long func_name(const void *key_ptr, size_t key_sz) {\
-		return _Generic(key,\
-				char *:		___hnv1az(*(char **)key_ptr),\
-				const char *:	___hnv1az(*(char **)key_ptr),\
-				default:	___hnv1a(key_ptr, key_sz));\
-	}
+#define ___hash(key) \
+	func((const void *key_ptr, size_t key_sz), \
+	     _Generic(key,\
+		      char *:		___hnv1az(*(char **)key_ptr),\
+		      const char *:	___hnv1az(*(char **)key_ptr),\
+		      default:		___hnv1a(key_ptr, key_sz)))
 
-#define ___cmpr_func(key, func_name) \
-	int func_name(const void *lhs, const void *rhs, size_t sz) {\
-		return _Generic(key,\
-				char *:		strcmp(*(char **)lhs, *(char **)rhs),\
-				const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
-				default:	memcmp(lhs, rhs, sz));\
-	}
+#define ___cmpr(key) \
+	func((const void *lhs, const void *rhs, size_t sz), \
+	     _Generic(key,\
+		      char *:		strcmp(*(char **)lhs, *(char **)rhs),\
+		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
+		      default:		memcmp(lhs, rhs, sz)))
+
 
 #ifndef ___PROBE_STEP
 #define ___PROBE_STEP 5
@@ -326,9 +325,8 @@ static inline unsigned long ___hnv1az(const char *key) {
  */
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	___hash_func(pair_.key, hashfn_);\
 	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
-				  sizeof((*(pptr))->key), hashfn_);\
+				  sizeof(pair_.key), ___hash(pair_.key));\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
@@ -434,10 +432,8 @@ static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz)
  */
 #define lookup(pptr, k) ({\
 	typeof((*(pptr))->key) key_ = k;\
-	___hash_func(key_, hashfn_);\
-	___cmpr_func(key_, cmprfn_);\
 	ssize_t slot_ = ___lookup((void **)pptr, &key_, sizeof(**(pptr)), \
-				  sizeof((*(pptr))->key), hashfn_, cmprfn_);\
+				  sizeof(key_), ___hash(key_), ___cmpr(key_));\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
