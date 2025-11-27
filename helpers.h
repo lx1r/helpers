@@ -41,9 +41,9 @@
 #define ___align_down(x, a)	___align((x) - ((a) - 1), (a))
 #define ___align_mask(x, mask)	(((x) + (mask)) & ~(mask))
 
-#define ___nr_bits(x) (sizeof(x) * 8)
-#define ___bit_mask(nr, x) (((typeof(x))1) << ((nr) % ___nr_bits(x)))
-#define ___bit_word(nr, x) ((nr) / ___nr_bits(x))
+#define ___nr_bits(x)		(sizeof(x) * 8)
+#define ___bit_mask(nr, x)	(((typeof(x))1) << ((nr) % ___nr_bits(x)))
+#define ___bit_word(nr, x)	((nr) / ___nr_bits(x))
 
 #define ___test_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))]  &  ___bit_mask(nr, *(bits)))
 #define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
@@ -73,8 +73,10 @@ static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 
 static inline void *zalloc(size_t size) { return calloc(1, size); }
-static void inline ___zfree(void **ptr) { free(*ptr); *ptr = NULL; }
-#define zfree(ptr) ___zfree((void **)(ptr))
+static void inline ___zfree(void **pptr) { free(*pptr); *pptr = NULL; }
+#define zfree(pptr) ___zfree((void **)(pptr))
+
+#define ___typeof(ptr) typeof(&(*(ptr)))
 
 #define ___cap_sz(ptr)		malloc_usable_size(ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
@@ -142,16 +144,6 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	return ___meta(ptr)->len;
 }
 
-static inline void ___pvfree(void *pptr)
-{
-	void **ptr = *(void ***)pptr;
-	size_t n = len(ptr);
-
-	for (size_t i = 0; i < n; i++)
-		free(ptr[i]);
-	free(ptr);
-}
-
 /**
  * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
  *
@@ -167,11 +159,23 @@ static inline void ___pvfree(void *pptr)
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
 
 #define ___foreach0(ref, ptr) \
-	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
+	for (___typeof(ptr) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
 	if (___inuse(ptr, (ref) - (ptr)))
 
 #define ___foreach1(ref, ptr, n) \
-	for (typeof(&(*(ptr))) ref = (ptr); ref < (ptr) + (n); ref++)
+	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
+
+static inline void ___vfree(void **ptr)
+{
+	size_t n = len(ptr);
+
+	foreach (p, ptr, n)
+		free(*p);
+	free(ptr);
+}
+
+#define vfree(ptr) ___vfree((void **)(ptr))
+static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
 
 /**
  * @fn type *reserve(type **pptr, size len, bool ext = false);
@@ -580,12 +584,12 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	size_t len_ = len;\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	typeof(ptr) *pptr_ = &(ptr);\
+	___typeof(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
-	___fill_pr_fmt(dst_, **pptr_);\
+	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += fprintf(fp, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
+		nb_ += fprintf(fp, fmt_, i_ ? sep : "", ptr_[i_]);\
 	}\
 	nb_;\
 })
@@ -645,17 +649,17 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	size_t len_ = len;\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	typeof(ptr) *pptr_ = &(ptr);\
+	___typeof(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
-	___fill_pr_fmt(dst_, **pptr_);\
+	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += snprintf(NULL, 0, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
+		nb_ += snprintf(NULL, 0, fmt_, i_ ? sep : "", ptr_[i_]);\
 	}\
 	char *buf_ = malloc(nb_ + 1);\
 	nb_ = 0;\
 	for (size_t i_ = 0; i_ < len_; i_++) {\
-		nb_ += sprintf(buf_ + nb_, fmt_, i_ ? sep : "", (*pptr_)[i_]);\
+		nb_ += sprintf(buf_ + nb_, fmt_, i_ ? sep : "", ptr_[i_]);\
 	}\
 	buf_;\
 })
@@ -676,10 +680,10 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	if (!str)
 		return NULL;
 
-	char *found_sep = strstr(str, sep);
-	if (found_sep) {
-		tok_len = found_sep - str;
-		*next = found_sep + sep_len;
+	char *next_sep = strstr(str, sep);
+	if (next_sep) {
+		tok_len = next_sep - str;
+		*next = next_sep + sep_len;
 	} else {
 		tok_len = strlen(str);
 		*next = NULL;
@@ -783,7 +787,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
 
 #define map(fn, lt) ({\
-	typeof(&(*(lt))) ret_ = NULL;\
+	___typeof(lt) ret_ = NULL;\
 	foreach (ref, lt) append(&ret_, fn(*ref));\
 	ret_;\
 })
