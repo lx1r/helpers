@@ -65,12 +65,6 @@ void walk_months()
 
 int main()
 {
-	println("align(0)=", ___align(0, sizeof(unsigned long)));
-	println("align(1)=", ___align(1, sizeof(unsigned long)));
-	println("align_down(1)=", ___align_down(1, sizeof(unsigned long)));
-	println("align_down(", sizeof(unsigned long), ")=", ___align_down(sizeof(unsigned long), sizeof(unsigned long)));
-	println("align_down(40)=", ___align_down(40, sizeof(unsigned long)));
-
 	find(7);
 
 	insert(&ptr, 1, 11);

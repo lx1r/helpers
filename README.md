@@ -45,6 +45,14 @@ may be any type
 
 ---
 
+`void vfree(type **ptr);`
+
+Releases allocated memory for each element of a dynamic array.
+
+* `ptr` -  pointer to the dynamic array, may be any type
+
+---
+
 `ssize_t append(type **pptr, type init);`
 
 Adds an element to the end of a dynamic array, expands memory
