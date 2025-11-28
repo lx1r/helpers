@@ -37,10 +37,6 @@
 	(ptr) += ___narg(__VA_ARGS__);\
 })
 
-#define ___align(x, a)		___align_mask(x, (typeof(x))(a) - 1)
-#define ___align_down(x, a)	___align((x) - ((a) - 1), (a))
-#define ___align_mask(x, mask)	(((x) + (mask)) & ~(mask))
-
 #define ___nr_bits(x)		(sizeof(x) * 8)
 #define ___bit_mask(nr, x)	(((typeof(x))1) << ((nr) % ___nr_bits(x)))
 #define ___bit_word(nr, x)	((nr) / ___nr_bits(x))
@@ -48,6 +44,8 @@
 #define ___test_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))]  &  ___bit_mask(nr, *(bits)))
 #define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
 #define ___clear_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] &= ~___bit_mask(nr, *(bits)))
+
+#define ___typeof(ptr) typeof(&(*(ptr)))
 
 #ifndef NO_LIBC
 
@@ -71,12 +69,6 @@
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
 static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
-
-static inline void *zalloc(size_t size) { return calloc(1, size); }
-static void inline ___zfree(void **pptr) { free(*pptr); *pptr = NULL; }
-#define zfree(pptr) ___zfree((void **)(pptr))
-
-#define ___typeof(ptr) typeof(&(*(ptr)))
 
 #define ___cap_sz(ptr)		malloc_usable_size(ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
@@ -165,18 +157,6 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 #define ___foreach1(ref, ptr, n) \
 	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
 
-static inline void ___vfree(void **ptr)
-{
-	size_t n = len(ptr);
-
-	foreach (p, ptr, n)
-		free(*p);
-	free(ptr);
-}
-
-#define vfree(ptr) ___vfree((void **)(ptr))
-static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
-
 /**
  * @fn type *reserve(type **pptr, size len, bool ext = false);
  *
@@ -212,6 +192,24 @@ static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 
 	return ptr;
 }
+
+/**
+ * @fn void vfree(type **ptr);
+ *
+ * @brief Releases allocated memory for each element of a dynamic array.
+ *
+ * @param ptr pointer to the dynamic array, may be any type
+ */
+#define vfree(ptr) ___vfree((void **)(ptr))
+
+static inline void ___vfree(void **ptr)
+{
+	foreach (p, ptr)
+		free(*p);
+	free(ptr);
+}
+
+static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
 
 /**
  * @fn ssize_t append(type **pptr, type init);
