@@ -82,11 +82,8 @@ int main()
 	for (int i = len(event_list)/8; i < len(event_list); i++)
 		find_event(event_list[i]);
 
-	println("len(event_map)=", len(event_map));
-	println("count(event_map)=", count(event_map));
 	println("len(event_list)=", len(event_list));
-
-	println("probes per lookup: ", ___lookup_probes/(double)___lookups);
+	//println("probes per lookup: ", ___lookup_probes/(double)___lookups);
 
 	return 0;
 }

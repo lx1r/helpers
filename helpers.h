@@ -72,6 +72,7 @@ static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
 
 #define ___cap_sz(ptr)		malloc_usable_size(ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
+#define ___INITIAL_LEN		___nr_bits(unsigned long)
 
 struct meta {
 	size_t len:__SIZE_WIDTH__ - 1;
@@ -174,7 +175,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 
 #define ___reserve2(pptr, len, ext) *(pptr) = ___reserve(len, sizeof(**(pptr)), ext)
 #define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
-#define ___reserve0(pptr) ___reserve1(pptr, 32)
+#define ___reserve0(pptr) ___reserve1(pptr, ___INITIAL_LEN)
 
 static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
 {
@@ -242,7 +243,7 @@ static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 	size_t cap = ptr ? (___cap_sz(ptr) - sizeof(struct meta)) / data_sz : 0;
 
 	if (len > cap) {
-		cap = cap ? cap + cap/4 : 32;
+		cap = cap ? cap + cap/4 : ___INITIAL_LEN;
 		ptr = realloc(ptr, data_sz*cap + sizeof(struct meta));
 		if (!ptr)
 			return NULL;
@@ -354,7 +355,7 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t old_cap = len(old_ptr);
-	if (!new_cap) new_cap = 32;
+	if (!new_cap) new_cap = ___INITIAL_LEN;
 
 	void *new_ptr = ___reserve(new_cap, pair_sz, true);
 	if (!new_ptr)

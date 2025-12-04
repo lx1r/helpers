@@ -109,9 +109,8 @@ Removes an element from an associative array.
 * `ref` -  reference to a data value associated with a key
 in the array, can be returned by `lookup()` method
 
-**Returns:** Index in the dynamic array that `ref` belonged to,
-the index is valid until any associative array method is called.
-`-1` is returned if `ref` in invalid.
+**Returns:** On success, zero is returned. If `ref` is invalid
+`-1` is returned.
 
 ---
 
