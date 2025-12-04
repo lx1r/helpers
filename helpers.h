@@ -301,11 +301,6 @@ static inline unsigned long ___hnv1az(const char *key) {
 		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
 		      default:		memcmp(lhs, rhs, sz)))
 
-
-#ifndef ___PROBE_STEP
-#define ___PROBE_STEP 5
-#endif
-
 /**
  * @fn ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);
  *
@@ -328,25 +323,30 @@ static inline unsigned long ___hnv1az(const char *key) {
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
-				  sizeof(pair_.key), ___hash(pair_.key));\
+				  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
-static inline ssize_t ___try_insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
+static inline ssize_t ___try_insert(void *ptr, void *pair, size_t pair_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
 {
-	void *ptr = *pptr;
 	size_t cap = len(ptr);
-	unsigned long hash = hashfn(pair, key_sz);
+	if (!cap)
+		return -1;
 
-	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-		ssize_t slot = (hash + i) % cap;
+	unsigned long hash = hashfn(pair, key_sz);
+	ssize_t slot = hash % cap;
+	ssize_t end = (slot + cap) % cap;
+
+	do {
 		if (!___inuse_test(ptr, slot)) {
 			memcpy(ptr + slot*pair_sz, pair, pair_sz);
 			___inuse_set(ptr, slot);
 			return slot;
 		}
-	}
+		slot = (slot + 1) % cap;
+	} while (slot != end);
+
 	return -1;
 }
 
@@ -362,7 +362,7 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 
 	for (ssize_t slot = 0; slot < old_cap; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t rc = ___try_insert(&new_ptr, old_ptr + slot*pair_sz,
+			ssize_t rc = ___try_insert(new_ptr, old_ptr + slot*pair_sz,
 						   pair_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(new_ptr);
@@ -379,7 +379,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(pptr, pair, pair_sz, key_sz, hashfn);
+		ssize_t slot = ___try_insert(ptr, pair, pair_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
 		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
@@ -398,15 +398,47 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
  * @param ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
  *
- * @return Index in the dynamic array that `ref` belonged to,
- * the index is valid until any associative array method is called.
- * `-1` is returned if `ref` in invalid.
+ * @return On success, zero is returned. If `ref` is invalid
+ * `-1` is returned.
  */
 #define delete(pptr, ref) ({\
-	___delete((void **)pptr, ref, sizeof(**(pptr)));\
+	___delete((void **)pptr, ref, sizeof(**(pptr)), \
+		  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
 })
 
-static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz)
+static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t pair_sz, size_t key_sz,
+				    unsigned long (*hashfn)(const void *, size_t))
+{
+	size_t cap = len(ptr);
+	ssize_t slot = empty;
+	ssize_t end = empty;
+
+	do {
+		slot = (slot + 1) % cap;
+		if (!___inuse_test(ptr, slot))
+			break;
+
+		unsigned long hash = hashfn(ptr + slot*pair_sz, key_sz);
+		ssize_t pos = hash % cap;
+
+		if (empty <= slot) {
+			if (empty < pos && pos <= slot)
+				continue;
+		} else {
+			if (pos <= slot || empty < pos)
+				continue;
+		}
+
+		___inuse_set(ptr, empty);
+		memcpy(ptr + empty*pair_sz, ptr + slot*pair_sz, pair_sz);
+		___inuse_clear(ptr, slot);
+		empty = slot;
+
+	} while (slot != end);
+}
+
+static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz, size_t key_sz,
+				unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
@@ -416,8 +448,9 @@ static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz)
 	if (slot < 0 || slot >= cap)
 		return -1;
 	___inuse_clear(ptr, slot);
+	___shift_cluster(ptr, slot, pair_sz, key_sz, hashfn);
 
-	return slot;
+	return 0;
 }
 
 /**
@@ -448,16 +481,22 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
+	if (!cap)
+		return -1;
 	unsigned long hash = hashfn(key_ptr, key_sz);
+	ssize_t slot = hash % cap;
+	ssize_t end = slot;
 
 	___lookups++;
-	for (size_t i = 0; i < cap; i += ___PROBE_STEP) {
-		ssize_t slot = (hash + i) % cap;
+	do {
 		___lookup_probes++;
-		if (___inuse_test(ptr, slot))
-			if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
-				return slot;
-	}
+		if (!___inuse_test(ptr, slot))
+			break;
+		else if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
+			return slot;
+		slot = (slot + 1) % cap;
+	} while (slot != end);
+
 	return -1;
 }
 
