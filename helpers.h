@@ -335,9 +335,8 @@ static inline ssize_t ___try_insert(void *ptr, void *pair, size_t pair_sz, size_
 	if (!cap)
 		return -1;
 
-	unsigned long hash = hashfn(pair, key_sz);
-	ssize_t slot = hash % cap;
-	ssize_t end = (slot + cap) % cap;
+	ssize_t slot = hashfn(pair, key_sz) % cap;
+	ssize_t end = (slot + cap/2) % cap;
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
@@ -355,7 +354,8 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t old_cap = len(old_ptr);
-	if (!new_cap) new_cap = ___INITIAL_LEN;
+	if (!new_cap)
+		new_cap = ___INITIAL_LEN;
 
 	void *new_ptr = ___reserve(new_cap, pair_sz, true);
 	if (!new_ptr)
@@ -419,9 +419,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t pair_sz, si
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		unsigned long hash = hashfn(ptr + slot*pair_sz, key_sz);
-		ssize_t pos = hash % cap;
-
+		ssize_t pos = hashfn(ptr + slot*pair_sz, key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -445,9 +443,9 @@ static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz, si
 	size_t cap = len(ptr);
 
 	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / pair_sz;
-
 	if (slot < 0 || slot >= cap)
 		return -1;
+	
 	___inuse_clear(ptr, slot);
 	___shift_cluster(ptr, slot, pair_sz, key_sz, hashfn);
 
@@ -484,8 +482,8 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
-	unsigned long hash = hashfn(key_ptr, key_sz);
-	ssize_t slot = hash % cap;
+	
+	ssize_t slot = hashfn(key_ptr, key_sz) % cap;
 	ssize_t end = slot;
 
 	___lookups++;
