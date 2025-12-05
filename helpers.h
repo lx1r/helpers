@@ -445,7 +445,7 @@ static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz, si
 	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / pair_sz;
 	if (slot < 0 || slot >= cap)
 		return -1;
-	
+
 	___inuse_clear(ptr, slot);
 	___shift_cluster(ptr, slot, pair_sz, key_sz, hashfn);
 
@@ -482,7 +482,7 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
-	
+
 	ssize_t slot = hashfn(key_ptr, key_sz) % cap;
 	ssize_t end = slot;
 
