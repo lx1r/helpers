@@ -74,8 +74,6 @@ int main()
 	for (int i = 0; i < len(event_list); i++)
 		find_event(event_list[i]);
 
-	//dump_events();
-
 	for (int i = 0; i < len(event_list)/8; i++)
 		unregister_event(event_list[i]);
 
@@ -83,7 +81,6 @@ int main()
 		find_event(event_list[i]);
 
 	println("len(event_list)=", len(event_list));
-	//println("probes per lookup: ", ___lookup_probes/(double)___lookups);
 
 	return 0;
 }
