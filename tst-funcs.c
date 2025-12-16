@@ -16,5 +16,8 @@ int main()
         reduce(func((size_t a, int b), a + println(b)), lz);
         println("cnt=", count(lz));
 
+	qsort(lx, len(lx), sizeof(*lx), func((const void *lhs, const void *rhs), *(int*)rhs - *(int*)lhs));
+        foreach (e, lx) println(*e);
+
 	return 0;
 }

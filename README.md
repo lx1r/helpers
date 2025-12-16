@@ -1,7 +1,7 @@
 
 `out(func)`
 
-A variable attribute to define deffered function.
+A variable attribute to define cleanup function.
 
 * `func` -  a function invoked when the variable goes out of scope,
 predefined functions: `close`, `fclose`, `free`, `vfree`.
