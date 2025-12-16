@@ -57,14 +57,14 @@
 #include <unistd.h>
 
 /**
- * @fn defer(func)
+ * @fn out(func)
  *
- * @brief A variable attribute to define deffered function.
+ * @brief A variable attribute to define cleanup function.
  *
  * @param func a function invoked when the variable goes out of scope,
  * predefined functions: `close`, `fclose`, `free`, `vfree`.
  */
-#define defer(func) __attribute__((__cleanup__(___p##func)))
+#define out(func) __attribute__((__cleanup__(___p##func)))
 
 static inline void ___pclose(int *pfd) { close(*pfd); }
 static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }

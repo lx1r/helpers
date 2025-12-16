@@ -1,5 +1,5 @@
 
-`defer(func)`
+`out(func)`
 
 A variable attribute to define deffered function.
 
