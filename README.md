@@ -132,7 +132,7 @@ if the key doesn't exist NULL pointer will be returned.
 Prints a list of values into a stream.
 
 * `fp` -  output stream
-* `` - ... list of values or constants of standard type to print
+* `...` -  list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
 
@@ -142,7 +142,7 @@ Prints a list of values into a stream.
 
 Prints a list of values into the standard output stream.
 
-* `` - ... list of values or constants of standard type to print
+* `...` -  list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
 
@@ -153,7 +153,7 @@ Prints a list of values into the standard output stream.
 Prints a line to a stream.
 
 * `fp` -  output stream
-* `` - ... list of values or constants of standard type to print
+* `...` -  list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
 
@@ -163,7 +163,7 @@ Prints a line to a stream.
 
 Prints a line to the standard output stream.
 
-* `` - ... list of values or constants of standard type to print
+* `...` -  list of values or constants of standard type to print
 
 **Returns:** The number of bytes printed.
 
@@ -198,7 +198,7 @@ Print an array to the standard output stream.
 
 Concatenates a list of values into a single string.
 
-* `` - ... list of values or constants of standard type to join
+* `...` -  list of values or constants of standard type to join
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
 
@@ -223,7 +223,7 @@ to the specified list of variables.
 
 * `str` -  the string to be parsed
 * `sep` -  substring delimits the tokens in the parsed string
-* `` - ... list of pointers to variables to assign token values to
+* `...` -  list of pointers to variables to assign token values to
 
 Tokens will be converted to the target type before assignment.
 For pointers to a string, the necessary amount of memory will be
