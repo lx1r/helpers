@@ -1,6 +1,10 @@
 #ifndef ___HELPERS_H
 #define ___HELPERS_H
 
+/*
+ * ## Generic helpers
+ */
+
 #ifndef ___concat
 #define ___concat(a, b) a ## b
 #endif
@@ -138,7 +142,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 }
 
 /**
- * @fn foreach(type *ref, type *ptr, size_t len = len(ptr))
+ * @fn foreach (type *ref, type *ptr, size_t len = len(ptr))
  *
  * @brief Iterate over a static, a variable-length, a dynamic or
  * an associative array.
@@ -257,7 +261,7 @@ static inline void *___extend(void *ptr, size_t len, size_t data_sz)
 }
 
 /**
- * @fn pair(ktype, vtype)
+ * @struct entry(ktype, vtype)
  *
  * @brief Associative array element type.
  *
@@ -268,7 +272,7 @@ static inline void *___extend(void *ptr, size_t len, size_t data_sz)
  * To pass associative array pointers to functions, the associative array type
  * must be fully qualified using the `typedef` keyword.
  */
-#define pair(ktype, vtype) struct { ktype key; vtype value; }
+#define entry(ktype, vtype) struct { ktype key; vtype value; }
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
 	unsigned long hash = 14695981039346656037UL;
@@ -303,7 +307,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 		      default:		memcmp(lhs, rhs, sz)))
 
 /**
- * @fn ssize_t insert(pair(ktype, vtype) **pptr, ktype key, vtype value);
+ * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype value);
  *
  * @brief Adds an element to a dynamic associative array, expands memory
  * usage if necessary.
@@ -312,7 +316,7 @@ static inline unsigned long ___hnv1az(const char *key) {
  * added, to prevent this, the `lookup` method should be used.
  *
  * @param pptr pointer to the associative array, may be declared using
- * `pair` macro
+ * `entry` macro
  * @param key associative array index value, maybe any standard type
  * @param init initializer for a new data element, may be an aggregate
  * initializer list
@@ -322,25 +326,25 @@ static inline unsigned long ___hnv1az(const char *key) {
  * on the associative array is called.
  */
 #define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) pair_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	ssize_t slot_ = ___insert((void **)pptr, &pair_, sizeof(**(pptr)), \
+	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
 				  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
-static inline ssize_t ___try_insert(void *ptr, void *pair, size_t pair_sz, size_t key_sz,
+static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
 
-	ssize_t slot = hashfn(pair, key_sz) % cap;
+	ssize_t slot = hashfn(entry, key_sz) % cap;
 	ssize_t end = (slot + cap/2) % cap;
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
-			memcpy(ptr + slot*pair_sz, pair, pair_sz);
+			memcpy(ptr + slot*entry_sz, entry, entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
 		}
@@ -350,21 +354,21 @@ static inline ssize_t ___try_insert(void *ptr, void *pair, size_t pair_sz, size_
 	return -1;
 }
 
-static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, size_t key_sz,
+static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t old_cap = len(old_ptr);
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *new_ptr = ___reserve(new_cap, pair_sz, true);
+	void *new_ptr = ___reserve(new_cap, entry_sz, true);
 	if (!new_ptr)
 		return NULL;
 
 	for (ssize_t slot = 0; slot < old_cap; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t rc = ___try_insert(new_ptr, old_ptr + slot*pair_sz,
-						   pair_sz, key_sz, hashfn);
+			ssize_t rc = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
+						   entry_sz, key_sz, hashfn);
 			if (rc == -1) {
 				free(new_ptr);
 				return NULL;
@@ -375,15 +379,15 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t pair_sz, siz
 	return new_ptr;
 }
 
-static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t key_sz,
+static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(ptr, pair, pair_sz, key_sz, hashfn);
+		ssize_t slot = ___try_insert(ptr, entry, entry_sz, key_sz, hashfn);
 		if (slot != -1)
 			return slot;
-		ptr = ___rehash(ptr, 2*len(ptr), pair_sz, key_sz, hashfn);
+		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -391,7 +395,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 }
 
 /**
- * @fn ssize_t delete(pair(ktype, vtype) **pptr, vtype *ref);
+ * @fn int delete(entry(ktype, vtype) **pptr, vtype *ref);
  *
  * @brief Removes an element from an associative array.
  *
@@ -407,7 +411,7 @@ static inline ssize_t ___insert(void **pptr, void *pair, size_t pair_sz, size_t 
 		  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
 })
 
-static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t pair_sz, size_t key_sz,
+static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t cap = len(ptr);
@@ -419,7 +423,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t pair_sz, si
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = hashfn(ptr + slot*pair_sz, key_sz) % cap;
+		ssize_t pos = hashfn(ptr + slot*entry_sz, key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -429,31 +433,31 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t pair_sz, si
 		}
 
 		___inuse_set(ptr, empty);
-		memcpy(ptr + empty*pair_sz, ptr + slot*pair_sz, pair_sz);
+		memcpy(ptr + empty*entry_sz, ptr + slot*entry_sz, entry_sz);
 		___inuse_clear(ptr, slot);
 		empty = slot;
 
 	} while (slot != end);
 }
 
-static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz, size_t key_sz,
+static inline int ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
 
-	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / pair_sz;
+	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / entry_sz;
 	if (slot < 0 || slot >= cap)
 		return -1;
 
 	___inuse_clear(ptr, slot);
-	___shift_cluster(ptr, slot, pair_sz, key_sz, hashfn);
+	___shift_cluster(ptr, slot, entry_sz, key_sz, hashfn);
 
 	return 0;
 }
 
 /**
- * @fn vtype *lookup(pair(ktype, vtype) **pptr, ktype key);
+ * @fn vtype *lookup(entry(ktype, vtype) **pptr, ktype key);
  *
  * @brief Searches a data associated with a key.
  *
@@ -474,7 +478,7 @@ static inline ssize_t ___delete(void **pptr, void *value_ptr, size_t pair_sz, si
 static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
-static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size_t key_sz,
+static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t entry_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t),
 				int (*cmprfn)(const void *, const void *, size_t))
 {
@@ -491,7 +495,7 @@ static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t pair_sz, size
 		___lookup_probes++;
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (cmprfn(ptr + slot*pair_sz, key_ptr, key_sz) == 0)
+		else if (cmprfn(ptr + slot*entry_sz, key_ptr, key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);
