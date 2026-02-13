@@ -441,7 +441,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, s
 }
 
 static inline int ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
-				unsigned long (*hashfn)(const void *, size_t))
+			    unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);

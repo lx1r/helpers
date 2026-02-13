@@ -1,8 +1,8 @@
 #include "helpers.h"
 
-typedef pair(char *, int) months;
+typedef entry(char *, int) month;
 
-void dump_months(months *months)
+void dump_months(month *months)
 {
 	foreach (month, months)
 		println(month->key, ": ", month->value);
@@ -10,7 +10,7 @@ void dump_months(months *months)
 
 int main()
 {
-	months *months = NULL;
+	month *months = NULL;
 
 	insert(&months, "january", 1);
 	insert(&months, "february", 2);

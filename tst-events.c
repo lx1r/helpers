@@ -1,7 +1,7 @@
 #include "helpers.h"
 
 int *event_list = NULL;
-pair(int, int) *event_map = NULL;
+entry(int, int) *event_map = NULL;
 
 static inline int event(void)
 {
