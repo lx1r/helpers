@@ -31,7 +31,7 @@ an associative array.
 
 
 ---
-`type *resize(type **pptr, size cap = 64);`
+`boot resize(type **pptr, size cap);`
 
 Changes the capacity of a dynamic or associative array.
 
@@ -77,7 +77,7 @@ To pass associative array pointers to functions, the associative array type
 must be fully qualified using the `typedef` keyword.
 
 ---
-`type *rehash(type **pptr, size cap = 64);`
+`bool rehash(type **pptr, size cap = 64);`
 
 Changes capacity of an associative array.
 

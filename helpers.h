@@ -163,7 +163,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
 
 /**
- * @fn type *resize(type **pptr, size cap = 64);
+ * @fn boot resize(type **pptr, size cap);
  *
  * @brief Changes the capacity of a dynamic or associative array.
  *
@@ -175,11 +175,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
  * capacity is not enought `false` is returned and the original
  * dynamic array does not change.
  */
-#define resize(pptr, ...)\
-	___apply(___resize, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
-
-#define ___resize0(pptr) ___resize1(pptr, 0)
-#define ___resize1(pptr, cap) ({\
+#define resize(pptr, cap) ({\
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_ = ___resize(*(void **)pptr, cap, sizeof(**(pptr)));\
 	if (ptr_) {\
@@ -316,7 +312,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 		      default:		memcmp(lhs, rhs, sz)))
 
 /**
- * @fn type *rehash(type **pptr, size cap = 64);
+ * @fn bool rehash(type **pptr, size cap = 64);
  *
  * @brief Changes capacity of an associative array.
  *
@@ -328,11 +324,7 @@ static inline unsigned long ___hnv1az(const char *key) {
  * capacity is not enought `false` is returned and the original
  * associative array does not change.
  */
-#define rehash(pptr, ...)\
-	___apply(___rehash, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
-
-#define ___rehash0(pptr) ___rehash1(pptr, 0)
-#define ___rehash1(pptr, cap) ({\
+#define rehash(pptr, cap) ({\
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)),\
 					 sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
