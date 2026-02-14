@@ -109,7 +109,7 @@ NULL if something went wrong. The reference is valid until any method
 on the associative array is called.
 
 ---
-`int delete(entry(ktype, vtype) **pptr, vtype *ref);`
+`bool delete(entry(ktype, vtype) **pptr, vtype *ref);`
 
 Removes an element from an associative array.
 
@@ -117,8 +117,8 @@ Removes an element from an associative array.
 * `ref` -  reference to a data value associated with a key
 in the array, can be returned by `lookup()` method
 
-**Returns:** On success, zero is returned. If `ref` is invalid
-`-1` is returned.
+**Returns:** On success, `true` is returned. If `ref` is invalid
+`false` is returned.
 
 ---
 `vtype *lookup(entry(ktype, vtype) **pptr, ktype key);`

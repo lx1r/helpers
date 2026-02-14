@@ -1,7 +1,7 @@
 lookup ret: 0x0
-delete ret: -1
+delete ret: 0
 lookup ret: 0x0
-delete ret: -1
+delete ret: 0
 registered event 3659 count=0
 registered event 28178 count=1
 registered event 25330 count=2

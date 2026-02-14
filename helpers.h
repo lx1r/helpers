@@ -281,7 +281,7 @@ static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
 	unsigned long hash = 14695981039346656037UL;
-	for (int i = 0; i < len; i++) {
+	for (size_t i = 0; i < len; i++) {
 		hash ^= ((unsigned char *)key)[i];
 		hash *= 1099511628211UL;
 	}
@@ -436,7 +436,7 @@ static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz, size_
 }
 
 /**
- * @fn int delete(entry(ktype, vtype) **pptr, vtype *ref);
+ * @fn bool delete(entry(ktype, vtype) **pptr, vtype *ref);
  *
  * @brief Removes an element from an associative array.
  *
@@ -444,8 +444,8 @@ static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz, size_
  * @param ref reference to a data value associated with a key
  * in the array, can be returned by `lookup()` method
  *
- * @return On success, zero is returned. If `ref` is invalid
- * `-1` is returned.
+ * @return On success, `true` is returned. If `ref` is invalid
+ * `false` is returned.
  */
 #define delete(pptr, ref) ({\
 	___delete((void **)pptr, ref, sizeof(**(pptr)), \
@@ -481,7 +481,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, s
 	} while (slot != end);
 }
 
-static inline int ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
+static inline bool ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
 			    unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
@@ -489,14 +489,14 @@ static inline int ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_
 
 	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / entry_sz;
 	if (slot < 0 || slot >= cap)
-		return -1;
+		return false;
 	if (!___inuse_test(ptr, slot))
-		return -1;
+		return false;
 
 	___inuse_clear(ptr, slot);
 	___shift_cluster(ptr, slot, entry_sz, key_sz, hashfn);
 
-	return 0;
+	return true;
 }
 
 /**
