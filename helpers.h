@@ -395,7 +395,7 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 }
 
 /**
- * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype value);
+ * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
  *
  * @brief Adds an element to a dynamic associative array, expands memory
  * usage if necessary.
