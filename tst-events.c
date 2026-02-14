@@ -56,7 +56,7 @@ void find_event(int ev)
 	println("found event ", ev, " count=", *data);
 }
 
-void sanity(void)
+void sanity_test(void)
 {
 	void *lookup_ret = lookup(&event_map, 11);
 	println("lookup ret: ", lookup_ret);
@@ -66,7 +66,10 @@ void sanity(void)
 
 int main()
 {
-	sanity();
+	sanity_test();
+	resize(&event_list, 400);
+	rehash(&event_map, 400);
+	sanity_test();
 
 	for (int i = 0; i < 10000; i++)
 		register_event();

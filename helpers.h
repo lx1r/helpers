@@ -163,40 +163,93 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
 
 /**
- * @fn type *reserve(type **pptr, size len, bool ext = false);
+ * @fn type *resize(type **pptr, size cap = 64);
  *
- * @brief Pre-allocates memory for an array.
+ * @brief Changes the capacity of a dynamic or associative array.
  *
- * @param pptr pointer to the dynamic or associative array,
- * may be any type
- * @param len pre-allocated items count
- * @param ext if true preallocate memory for an associative array
+ * @param pptr pointer to the dynamic array, may be any type
+ * @param cap requested capacity, if the array length is less
+ * than the requested capacity, the length will be truncated
  *
- * @return Pointer to the pre-allocated array.
+ * @return On success, `true` is returned. If the requested
+ * capacity is not enought `false` is returned and the original
+ * dynamic array does not change.
  */
-#define reserve(pptr, ...)\
-	___apply(___reserve, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
+#define resize(pptr, ...)\
+	___apply(___resize, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
 
-#define ___reserve2(pptr, len, ext) *(pptr) = ___reserve(len, sizeof(**(pptr)), ext)
-#define ___reserve1(pptr, len) ___reserve2(pptr, len, false)
-#define ___reserve0(pptr) ___reserve1(pptr, ___INITIAL_LEN)
+#define ___resize0(pptr) ___resize1(pptr, 0)
+#define ___resize1(pptr, cap) ({\
+	bool ret_ = false;\
+	typeof(*(pptr)) ptr_ = ___resize(*(void **)pptr, cap, sizeof(**(pptr)));\
+	if (ptr_) {\
+		*(pptr) = ptr_;\
+		ret_ = true;\
+	}\
+	ret_;\
+})
 
-static inline void *___reserve(size_t cap, size_t data_sz, bool ext)
+static inline void *___resize(void *old_ptr, size_t new_cap, size_t entry_sz)
 {
-	void *ptr = malloc(data_sz*cap + sizeof(struct meta) +
-			   (ext ? /*sizeof(struct meta_ext)*/ + ___inuse_sz(cap) : 0));
+	size_t old_len = len(old_ptr);
+	if (!new_cap)
+		new_cap = ___INITIAL_LEN;
+
+	void *ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct meta));
 	if (!ptr)
 		return NULL;
 
-	struct meta *meta = ___meta(ptr);
-	meta->len = ext ? cap : 0;
-	meta->ext = ext;
+	/* truncation requested */
+	if (old_len > new_cap)
+		old_len = new_cap;
 
-	if (ext)
-		memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
+	struct meta *meta = ___meta(ptr);
+	meta->len = old_len;
+	meta->ext = 0;
 
 	return ptr;
 }
+
+static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz)
+{
+	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct meta)) / entry_sz : 0;
+	void *ptr = old_ptr;
+
+	if (new_len > old_cap) {
+		size_t new_cap = old_cap ? old_cap + old_cap/4 : 0;
+		ptr = ___resize(old_ptr, new_cap, entry_sz);
+	}
+	if (ptr)
+		___meta(ptr)->len = new_len;
+
+	return ptr;
+}
+
+/**
+ * @fn ssize_t append(type **pptr, type init);
+ *
+ * @brief Adds an element to the end of a dynamic array, expands memory
+ * usage if necessary.
+ *
+ * @param pptr pointer to the dynamic array, may be any type
+ * @param init initializer for a new array element, may be an aggregate
+ * initializer list
+ *
+ * @return Index in the array where the new value is appended or `-1`
+ * if something went wrong, the index is valid until any method on the
+ * dynamic array is called.
+ */
+#define append(pptr, ...) ({\
+	ssize_t slot_ = len(*(pptr));\
+	typeof(*(pptr)) ptr_ = ___try_extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
+	if (ptr_) {\
+		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
+		*(pptr) = ptr_;\
+	} else {\
+		slot_ = -1;\
+	}\
+	slot_;\
+})
 
 /**
  * @fn void vfree(type **ptr);
@@ -215,50 +268,6 @@ static inline void ___vfree(void **ptr)
 }
 
 static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
-
-/**
- * @fn ssize_t append(type **pptr, type init);
- *
- * @brief Adds an element to the end of a dynamic array, expands memory
- * usage if necessary.
- *
- * @param pptr pointer to the dynamic array, may be any type
- * @param init initializer for a new array element, may be an aggregate
- * initializer list
- *
- * @return Index in the array where the new value is appended or `-1`
- * if something went wrong, the index is valid until any method on the
- * dynamic array is called.
- */
-#define append(pptr, ...) ({\
-	ssize_t slot_ = len(*(pptr));\
-	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
-	if (ptr_) {\
-		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
-		*(pptr) = ptr_;\
-	} else {\
-		slot_ = -1;\
-	}\
-	slot_;\
-})
-
-static inline void *___extend(void *ptr, size_t len, size_t data_sz)
-{
-	size_t cap = ptr ? (___cap_sz(ptr) - sizeof(struct meta)) / data_sz : 0;
-
-	if (len > cap) {
-		cap = cap ? cap + cap/4 : ___INITIAL_LEN;
-		ptr = realloc(ptr, data_sz*cap + sizeof(struct meta));
-		if (!ptr)
-			return NULL;
-	}
-
-	struct meta *meta = ___meta(ptr);
-	meta->len = len;
-	meta->ext = 0;
-
-	return ptr;
-}
 
 /**
  * @struct entry(ktype, vtype)
@@ -307,30 +316,44 @@ static inline unsigned long ___hnv1az(const char *key) {
 		      default:		memcmp(lhs, rhs, sz)))
 
 /**
- * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype value);
+ * @fn type *rehash(type **pptr, size cap = 64);
  *
- * @brief Adds an element to a dynamic associative array, expands memory
- * usage if necessary.
+ * @brief Changes capacity of an associative array.
  *
- * If an element with the same key exists, a duplicate element will be
- * added, to prevent this, the `lookup` method should be used.
+ * @param pptr pointer to the associative array,
+ * may be any type
+ * @param cap requested capacity
  *
- * @param pptr pointer to the associative array, may be declared using
- * `entry` macro
- * @param key associative array index value, maybe any standard type
- * @param init initializer for a new data element, may be an aggregate
- * initializer list
- *
- * @return Reference to the inserted data in the associative array or
- * NULL if something went wrong. The reference is valid until any method
- * on the associative array is called.
+ * @return On success, `true` is returned. If the requested
+ * capacity is not enought `false` is returned and the original
+ * associative array does not change.
  */
-#define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
-				  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+#define rehash(pptr, ...)\
+	___apply(___rehash, ___narg(__VA_ARGS__))(pptr, ##__VA_ARGS__)
+
+#define ___rehash0(pptr) ___rehash1(pptr, 0)
+#define ___rehash1(pptr, cap) ({\
+	bool ret_ = false;\
+	typeof(*(pptr)) ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)),\
+					 sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+	if (ptr_) {\
+		*(pptr) = ptr_;\
+		ret_ = true;\
+	}\
+	ret_;\
 })
+
+static inline void *___reserve_ext(size_t cap, size_t entry_sz)
+{
+	void *ptr = malloc(entry_sz*cap + sizeof(struct meta) + ___inuse_sz(cap));
+	if (!ptr)
+		return NULL;
+	struct meta *meta = ___meta(ptr);
+	meta->len = cap;
+	meta->ext = 1;
+	memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
+	return ptr;
+}
 
 static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz, size_t key_sz,
 				    unsigned long (*hashfn)(const void *, size_t))
@@ -357,15 +380,15 @@ static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz, siz
 static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, size_t key_sz,
 			      unsigned long (*hashfn)(const void *, size_t))
 {
-	size_t old_cap = len(old_ptr);
+	size_t old_len = len(old_ptr);
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *new_ptr = ___reserve(new_cap, entry_sz, true);
+	void *new_ptr = ___reserve_ext(new_cap, entry_sz);
 	if (!new_ptr)
 		return NULL;
 
-	for (ssize_t slot = 0; slot < old_cap; slot++) {
+	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
 			ssize_t rc = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
 						   entry_sz, key_sz, hashfn);
@@ -378,6 +401,32 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 	free(old_ptr);
 	return new_ptr;
 }
+
+/**
+ * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype value);
+ *
+ * @brief Adds an element to a dynamic associative array, expands memory
+ * usage if necessary.
+ *
+ * If an element with the same key exists, a duplicate element will be
+ * added, to prevent this, the `lookup` method should be used.
+ *
+ * @param pptr pointer to the associative array, may be declared using
+ * `entry` macro
+ * @param key associative array index value, maybe any standard type
+ * @param init initializer for a new data element, may be an aggregate
+ * initializer list
+ *
+ * @return Reference to the inserted data in the associative array or
+ * NULL if something went wrong. The reference is valid until any method
+ * on the associative array is called.
+ */
+#define insert(pptr, k, ...) ({\
+	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
+				  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+})
 
 static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t))
@@ -448,6 +497,8 @@ static inline int ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_
 
 	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / entry_sz;
 	if (slot < 0 || slot >= cap)
+		return -1;
+	if (!___inuse_test(ptr, slot))
 		return -1;
 
 	___inuse_clear(ptr, slot);
