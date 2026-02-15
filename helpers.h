@@ -328,8 +328,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_;\
 	ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)), \
-			 sizeof((**(pptr)).key), ___hash((**(pptr)).key), \
-			 ___cmpr((**(pptr)).key));\
+			 sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
@@ -381,8 +380,7 @@ static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz,
 }
 
 static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, size_t key_sz,
-			      unsigned long (*hashfn)(const void *, size_t),
-			      int (*cmprfn)(const void *, const void *, size_t))
+			      unsigned long (*hashfn)(const void *, size_t))
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
@@ -395,7 +393,7 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
 			ssize_t ret = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
-						   entry_sz, NULL, key_sz, hashfn, cmprfn, false);
+						    entry_sz, NULL, key_sz, hashfn, NULL, false);
 			if (ret == -1) {
 				free(new_ptr);
 				return NULL;
@@ -470,7 +468,7 @@ static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz,
 			return slot;
 		else if (slot == -2)
 			break;
-		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn, cmprfn);
+		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -524,7 +522,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, s
 }
 
 static inline bool ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
-			    unsigned long (*hashfn)(const void *, size_t))
+			     unsigned long (*hashfn)(const void *, size_t))
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
