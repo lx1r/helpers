@@ -100,8 +100,8 @@ static inline unsigned long *___inuse_bits(struct meta *meta)
 #define ___inuse_clear(ptr, slot)	___clear_bit(slot, ___inuse_bits(___meta(ptr)))
 
 #define ___inuse(ptr, slot) \
-	_Generic(&(ptr), \
-		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot), \
+	_Generic(&(ptr),\
+		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot),\
 		 default: true)
 
 static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
@@ -124,8 +124,8 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
  * @return Number of elements in the array.
  */
 #define len(ptr) \
-	_Generic(&(ptr), \
-		 typeof(*(ptr)) **: ___dynamic_len, \
+	_Generic(&(ptr),\
+		 typeof(*(ptr)) **: ___dynamic_len,\
 		 default: ___builtin_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
 static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
@@ -298,18 +298,32 @@ static inline unsigned long ___hnv1az(const char *key) {
 }
 
 #define ___hash(key) \
-	func((const void *key_ptr, size_t key_sz), \
+	func((const void *key_ptr, size_t key_sz),\
 	     _Generic(key,\
 		      char *:		___hnv1az(*(char **)key_ptr),\
 		      const char *:	___hnv1az(*(char **)key_ptr),\
 		      default:		___hnv1a(key_ptr, key_sz)))
 
 #define ___cmpr(key) \
-	func((const void *lhs, const void *rhs, size_t sz), \
+	func((const void *lhs, const void *rhs, size_t sz),\
 	     _Generic(key,\
 		      char *:		strcmp(*(char **)lhs, *(char **)rhs),\
 		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
 		      default:		memcmp(lhs, rhs, sz)))
+
+struct ___entry_disp {
+	size_t key_sz;
+	size_t entry_sz;
+	unsigned long (*hashfn)(const void *, size_t);
+	int (*cmprfn)(const void *, const void *, size_t);
+};
+
+#define ___disp(pptr) &(struct ___entry_disp){\
+	sizeof((**(pptr)).key),\
+	sizeof(**(pptr)),\
+	___hash((**(pptr)).key),\
+	___cmpr((**(pptr)).key)\
+}
 
 /**
  * @fn bool rehash(type **pptr, size cap = 64);
@@ -327,8 +341,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 #define rehash(pptr, cap) ({\
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_;\
-	ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)), \
-			 sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+	ptr_ = ___rehash(*(void **)pptr, ___disp(pptr), cap);\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
@@ -348,52 +361,48 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	return ptr;
 }
 
-static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz,
-				    void *key_ptr, size_t key_sz,
-				    unsigned long (*hashfn)(const void *, size_t),
-				    int (*cmprfn)(const void *, const void *, size_t),
-				    bool update)
+static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void *entry,
+				    void *key_ptr, bool update)
 {
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
 
-	ssize_t slot = hashfn(entry, key_sz) % cap;
-	ssize_t end = (slot + cap/2) % cap;
+	ssize_t slot = disp->hashfn(entry, disp->key_sz) % cap;
+	ssize_t end = (slot + cap/2) % cap; /* check only half */
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
-			memcpy(ptr + slot*entry_sz, entry, entry_sz);
+			memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
-		} else if (key_ptr && cmprfn(ptr + slot*entry_sz, key_ptr, key_sz) == 0) {
+		} else if (key_ptr && disp->cmprfn(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0) {
 			if (update) {
-				memcpy(ptr + slot*entry_sz, entry, entry_sz);
+				memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 				return slot;
 			}
-			return -2; /* exist */
+			return -2; /* -EEXIST */
 		}
 		slot = (slot + 1) % cap;
 	} while (slot != end);
 
-	return -1; /* no free space */
+	return -1; /* -ENOMEM */
 }
 
-static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, size_t key_sz,
-			      unsigned long (*hashfn)(const void *, size_t))
+static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t new_cap)
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *new_ptr = ___reserve_ext(new_cap, entry_sz);
+	void *new_ptr = ___reserve_ext(new_cap, disp->entry_sz);
 	if (!new_ptr)
 		return NULL;
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t ret = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
-						    entry_sz, NULL, key_sz, hashfn, NULL, false);
+			ssize_t ret = ___try_insert(new_ptr, disp, old_ptr + slot*disp->entry_sz,
+						    NULL, false);
 			if (ret == -1) {
 				free(new_ptr);
 				return NULL;
@@ -422,10 +431,8 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
  */
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
-				  &entry_.key, sizeof((**(pptr)).key), \
-				  ___hash((**(pptr)).key), \
-				  ___cmpr((**(pptr)).key), false);\
+	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
+				  &entry_.key, false);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
@@ -447,32 +454,26 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
  */
 #define update(pptr, k, ...) ({\
 	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
-				  &entry_.key, sizeof((**(pptr)).key), \
-				  ___hash((**(pptr)).key), \
-				  ___cmpr((**(pptr)).key), true);\
+	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
+				  &entry_.key, true);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
-static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz,
-				void *key_ptr, size_t key_sz,
-				unsigned long (*hashfn)(const void *, size_t),
-				int (*cmprfn)(const void *, const void *, size_t),
-				bool update)
+static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
+				void *entry, void *key_ptr, bool update)
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(ptr, entry, entry_sz, key_ptr, key_sz,
-					     hashfn, cmprfn, update);
+		ssize_t slot = ___try_insert(ptr, disp, entry, key_ptr, update);
 		if (slot >= 0)
 			return slot;
 		else if (slot == -2)
-			break;
-		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn);
+			break; /* EEXIST */
+		ptr = ___rehash(ptr, disp, 2*len(ptr));
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
-	return -1;
+	return -1; /* ENOMEM */
 }
 
 /**
@@ -488,12 +489,10 @@ static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz,
  * `false` is returned.
  */
 #define delete(pptr, ref) ({\
-	___delete((void **)pptr, ref, sizeof(**(pptr)), \
-		  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+	___delete((void **)pptr, ___disp(pptr), ref);\
 })
 
-static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, size_t key_sz,
-				    unsigned long (*hashfn)(const void *, size_t))
+static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize_t empty)
 {
 	size_t cap = len(ptr);
 	ssize_t slot = empty;
@@ -504,7 +503,7 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, s
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = hashfn(ptr + slot*entry_sz, key_sz) % cap;
+		ssize_t pos = disp->hashfn(ptr + slot*disp->entry_sz, disp->key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -514,27 +513,26 @@ static inline void ___shift_cluster(void *ptr, ssize_t empty, size_t entry_sz, s
 		}
 
 		___inuse_set(ptr, empty);
-		memcpy(ptr + empty*entry_sz, ptr + slot*entry_sz, entry_sz);
+		memcpy(ptr + empty*disp->entry_sz, ptr + slot*disp->entry_sz, disp->entry_sz);
 		___inuse_clear(ptr, slot);
 		empty = slot;
 
 	} while (slot != end);
 }
 
-static inline bool ___delete(void **pptr, void *value_ptr, size_t entry_sz, size_t key_sz,
-			     unsigned long (*hashfn)(const void *, size_t))
+static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *value_ptr)
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
 
-	ssize_t slot = ((unsigned long)value_ptr - (unsigned long)ptr) / entry_sz;
+	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / disp->entry_sz;
 	if (slot < 0 || slot >= cap)
 		return false;
 	if (!___inuse_test(ptr, slot))
 		return false;
 
 	___inuse_clear(ptr, slot);
-	___shift_cluster(ptr, slot, entry_sz, key_sz, hashfn);
+	___shift_cluster(ptr, disp, slot);
 
 	return true;
 }
@@ -553,27 +551,21 @@ static inline bool ___delete(void **pptr, void *value_ptr, size_t entry_sz, size
  */
 #define lookup(pptr, k) ({\
 	typeof((**(pptr)).key) key_ = k;\
-	ssize_t slot_ = ___lookup((void **)pptr, sizeof(**(pptr)), \
-				  &key_, sizeof((**(pptr)).key), \
-				  ___hash((**(pptr)).key), \
-				  ___cmpr((**(pptr)).key));\
+	ssize_t slot_ = ___lookup((void **)pptr, ___disp(pptr), &key_);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
 static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
-static inline ssize_t ___lookup(void **pptr, size_t entry_sz,
-				void *key_ptr, size_t key_sz,
-				unsigned long (*hashfn)(const void *, size_t),
-				int (*cmprfn)(const void *, const void *, size_t))
+static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *key_ptr)
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
 
-	ssize_t slot = hashfn(key_ptr, key_sz) % cap;
+	ssize_t slot = disp->hashfn(key_ptr, disp->key_sz) % cap;
 	ssize_t end = slot;
 
 	___lookups++;
@@ -581,7 +573,7 @@ static inline ssize_t ___lookup(void **pptr, size_t entry_sz,
 		___lookup_probes++;
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (cmprfn(ptr + slot*entry_sz, key_ptr, key_sz) == 0)
+		else if (disp->cmprfn(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);
