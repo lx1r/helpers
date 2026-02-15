@@ -297,20 +297,6 @@ static inline unsigned long ___hnv1az(const char *key) {
 	return hash;
 }
 
-#define ___hash(key) \
-	func((const void *key_ptr, size_t key_sz),\
-	     _Generic(key,\
-		      char *:		___hnv1az(*(char **)key_ptr),\
-		      const char *:	___hnv1az(*(char **)key_ptr),\
-		      default:		___hnv1a(key_ptr, key_sz)))
-
-#define ___cmpr(key) \
-	func((const void *lhs, const void *rhs, size_t sz),\
-	     _Generic(key,\
-		      char *:		strcmp(*(char **)lhs, *(char **)rhs),\
-		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
-		      default:		memcmp(lhs, rhs, sz)))
-
 struct ___entry_disp {
 	size_t key_sz;
 	size_t entry_sz;
@@ -321,8 +307,17 @@ struct ___entry_disp {
 #define ___disp(pptr) &(struct ___entry_disp){\
 	sizeof((**(pptr)).key),\
 	sizeof(**(pptr)),\
-	___hash((**(pptr)).key),\
-	___cmpr((**(pptr)).key)\
+	func((const void *key_ptr, size_t key_sz),\
+	     _Generic((**(pptr)).key,\
+		      char *:		___hnv1az(*(char **)key_ptr),\
+		      const char *:	___hnv1az(*(char **)key_ptr),\
+		      default:		___hnv1a(key_ptr, key_sz))),\
+					\
+	func((const void *lhs, const void *rhs, size_t sz),\
+	     _Generic((**(pptr)).key,\
+		      char *:		strcmp(*(char **)lhs, *(char **)rhs),\
+		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
+		      default:		memcmp(lhs, rhs, sz)))\
 }
 
 /**
