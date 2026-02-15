@@ -165,7 +165,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 /**
  * @fn boot resize(type **pptr, size cap);
  *
- * @brief Changes the capacity of a dynamic or associative array.
+ * @brief Changes the capacity of a dynamic array.
  *
  * @param pptr pointer to the dynamic array, may be any type
  * @param cap requested capacity, if the array length is less
@@ -270,8 +270,8 @@ static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
  *
  * @brief Associative array element type.
  *
- * @param ktype associative array index (key) type, can be any non-pointer
- * type except a pointer to a null terminated string
+ * @param ktype associative array index (key) type, can be any built-in
+ * scalar type or a pointer to a null terminated string
  * @param vtype a type of value associated with the key, can be any type
  *
  * To pass associative array pointers to functions, the associative array type
@@ -314,7 +314,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 /**
  * @fn bool rehash(type **pptr, size cap = 64);
  *
- * @brief Changes capacity of an associative array.
+ * @brief Changes the capacity of an associative array.
  *
  * @param pptr pointer to the associative array,
  * may be any type
@@ -326,8 +326,10 @@ static inline unsigned long ___hnv1az(const char *key) {
  */
 #define rehash(pptr, cap) ({\
 	bool ret_ = false;\
-	typeof(*(pptr)) ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)),\
-					 sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+	typeof(*(pptr)) ptr_;\
+	ptr_ = ___rehash(*(void **)pptr, cap, sizeof(**(pptr)), \
+			 sizeof((**(pptr)).key), ___hash((**(pptr)).key), \
+			 ___cmpr((**(pptr)).key));\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
@@ -347,8 +349,11 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	return ptr;
 }
 
-static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz, size_t key_sz,
-				    unsigned long (*hashfn)(const void *, size_t))
+static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz,
+				    void *key_ptr, size_t key_sz,
+				    unsigned long (*hashfn)(const void *, size_t),
+				    int (*cmprfn)(const void *, const void *, size_t),
+				    bool update)
 {
 	size_t cap = len(ptr);
 	if (!cap)
@@ -362,15 +367,22 @@ static inline ssize_t ___try_insert(void *ptr, void *entry, size_t entry_sz, siz
 			memcpy(ptr + slot*entry_sz, entry, entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
+		} else if (key_ptr && cmprfn(ptr + slot*entry_sz, key_ptr, key_sz) == 0) {
+			if (update) {
+				memcpy(ptr + slot*entry_sz, entry, entry_sz);
+				return slot;
+			}
+			return -2; /* exist */
 		}
 		slot = (slot + 1) % cap;
 	} while (slot != end);
 
-	return -1;
+	return -1; /* no free space */
 }
 
 static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, size_t key_sz,
-			      unsigned long (*hashfn)(const void *, size_t))
+			      unsigned long (*hashfn)(const void *, size_t),
+			      int (*cmprfn)(const void *, const void *, size_t))
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
@@ -382,12 +394,12 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t rc = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
-						   entry_sz, key_sz, hashfn);
-			if (rc == -1) {
+			ssize_t ret = ___try_insert(new_ptr, old_ptr + slot*entry_sz,
+						   entry_sz, NULL, key_sz, hashfn, cmprfn, false);
+			if (ret == -1) {
 				free(new_ptr);
 				return NULL;
-			}
+			} /* ret == -2 is unexpected here */
 		}
 	}
 	free(old_ptr);
@@ -397,11 +409,8 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 /**
  * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
  *
- * @brief Adds an element to a dynamic associative array, expands memory
- * usage if necessary.
- *
- * If an element with the same key exists, a duplicate element will be
- * added, to prevent this, the `lookup` method should be used.
+ * @brief Adds a new element to a dynamic associative array only if it
+ * did not exist, exapands memory usage if necessary.
  *
  * @param pptr pointer to the associative array, may be declared using
  * `entry` macro
@@ -416,19 +425,52 @@ static inline void *___rehash(void *old_ptr, size_t new_cap, size_t entry_sz, si
 #define insert(pptr, k, ...) ({\
 	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
 	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
-				  sizeof((**(pptr)).key), ___hash((**(pptr)).key));\
+				  &entry_.key, sizeof((**(pptr)).key), \
+				  ___hash((**(pptr)).key), \
+				  ___cmpr((**(pptr)).key), false);\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
-static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz, size_t key_sz,
-				unsigned long (*hashfn)(const void *, size_t))
+/**
+ * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
+ *
+ * @brief Adds a a new element or update an existing element to a dynamic
+ * associative array, exapands memory usage if necessary.
+ *
+ * @param pptr pointer to the associative array, may be declared using
+ * `entry` macro
+ * @param key associative array index value, maybe any standard type
+ * @param init initializer for a new data element, may be an aggregate
+ * initializer list
+ *
+ * @return Reference to the updated data in the associative array or
+ * NULL if something went wrong. The reference is valid until any method
+ * on the associative array is called.
+ */
+#define update(pptr, k, ...) ({\
+	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+	ssize_t slot_ = ___insert((void **)pptr, &entry_, sizeof(**(pptr)), \
+				  &entry_.key, sizeof((**(pptr)).key), \
+				  ___hash((**(pptr)).key), \
+				  ___cmpr((**(pptr)).key), true);\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+})
+
+static inline ssize_t ___insert(void **pptr, void *entry, size_t entry_sz,
+				void *key_ptr, size_t key_sz,
+				unsigned long (*hashfn)(const void *, size_t),
+				int (*cmprfn)(const void *, const void *, size_t),
+				bool update)
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(ptr, entry, entry_sz, key_sz, hashfn);
-		if (slot != -1)
+		ssize_t slot = ___try_insert(ptr, entry, entry_sz, key_ptr, key_sz,
+					     hashfn, cmprfn, update);
+		if (slot >= 0)
 			return slot;
-		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn);
+		else if (slot == -2)
+			break;
+		ptr = ___rehash(ptr, 2*len(ptr), entry_sz, key_sz, hashfn, cmprfn);
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -512,16 +554,19 @@ static inline bool ___delete(void **pptr, void *value_ptr, size_t entry_sz, size
  * if the key doesn't exist NULL pointer will be returned.
  */
 #define lookup(pptr, k) ({\
-	typeof((*(pptr))->key) key_ = k;\
-	ssize_t slot_ = ___lookup((void **)pptr, &key_, sizeof(**(pptr)), \
-				  sizeof(key_), ___hash(key_), ___cmpr(key_));\
+	typeof((**(pptr)).key) key_ = k;\
+	ssize_t slot_ = ___lookup((void **)pptr, sizeof(**(pptr)), \
+				  &key_, sizeof((**(pptr)).key), \
+				  ___hash((**(pptr)).key), \
+				  ___cmpr((**(pptr)).key));\
 	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
 })
 
 static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
-static inline ssize_t ___lookup(void **pptr, void *key_ptr, size_t entry_sz, size_t key_sz,
+static inline ssize_t ___lookup(void **pptr, size_t entry_sz,
+				void *key_ptr, size_t key_sz,
 				unsigned long (*hashfn)(const void *, size_t),
 				int (*cmprfn)(const void *, const void *, size_t))
 {

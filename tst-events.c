@@ -22,14 +22,14 @@ void register_event(void)
 	int ev = event();
 	static int count = 0;
 
-	int *data = lookup(&event_map, ev);
-	if (data) {
+	int *data = insert(&event_map, ev, count);
+	if (!data) {
 		println("event ", ev, " already registered");
 		return;
 	}
-	data = insert(&event_map, ev, count++);
 	println("registered event ", ev, " count=", *data);
 	append(&event_list, ev);
+	count++;
 }
 
 void unregister_event(int ev)

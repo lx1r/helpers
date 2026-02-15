@@ -33,7 +33,7 @@ an associative array.
 ---
 `boot resize(type **pptr, size cap);`
 
-Changes the capacity of a dynamic or associative array.
+Changes the capacity of a dynamic array.
 
 * `pptr` -  pointer to the dynamic array, may be any type
 * `cap` -  requested capacity, if the array length is less
@@ -69,8 +69,8 @@ Releases allocated memory for each element of a dynamic array.
 
 Associative array element type.
 
-* `ktype` -  associative array index (key) type, can be any non-pointer
-type except a pointer to a null terminated string
+* `ktype` -  associative array index (key) type, can be any built-in
+scalar type or a pointer to a null terminated string
 * `vtype` -  a type of value associated with the key, can be any type
 
 To pass associative array pointers to functions, the associative array type
@@ -79,7 +79,7 @@ must be fully qualified using the `typedef` keyword.
 ---
 `bool rehash(type **pptr, size cap = 64);`
 
-Changes capacity of an associative array.
+Changes the capacity of an associative array.
 
 * `pptr` -  pointer to the associative array,
 may be any type
@@ -90,13 +90,10 @@ capacity is not enought `false` is returned and the original
 associative array does not change.
 
 ---
-`vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype value);`
+`vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);`
 
-Adds an element to a dynamic associative array, expands memory
-usage if necessary.
-
-If an element with the same key exists, a duplicate element will be
-added, to prevent this, the `lookup` method should be used.
+Adds a new element to a dynamic associative array only if it
+did not exist, exapands memory usage if necessary.
 
 * `pptr` -  pointer to the associative array, may be declared using
 `entry` macro
@@ -105,6 +102,22 @@ added, to prevent this, the `lookup` method should be used.
 initializer list
 
 **Returns:** Reference to the inserted data in the associative array or
+NULL if something went wrong. The reference is valid until any method
+on the associative array is called.
+
+---
+`vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);`
+
+Adds a a new element or update an existing element to a dynamic
+associative array, exapands memory usage if necessary.
+
+* `pptr` -  pointer to the associative array, may be declared using
+`entry` macro
+* `key` -  associative array index value, maybe any standard type
+* `init` -  initializer for a new data element, may be an aggregate
+initializer list
+
+**Returns:** Reference to the updated data in the associative array or
 NULL if something went wrong. The reference is valid until any method
 on the associative array is called.
 
