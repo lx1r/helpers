@@ -41,7 +41,7 @@ than the requested capacity, the length will be truncated
 
 **Returns:** On success, `true` is returned. If the requested
 capacity is not enought `false` is returned and the original
-dynamic array does not change.
+dynamic array is left untouched.
 
 ---
 `ssize_t append(type **pptr, type init);`
@@ -87,7 +87,7 @@ may be any type
 
 **Returns:** On success, `true` is returned. If the requested
 capacity is not enought `false` is returned and the original
-associative array does not change.
+associative array is left untouched.
 
 ---
 `vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);`

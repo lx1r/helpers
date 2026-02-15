@@ -173,7 +173,7 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
  *
  * @return On success, `true` is returned. If the requested
  * capacity is not enought `false` is returned and the original
- * dynamic array does not change.
+ * dynamic array is left untouched.
  */
 #define resize(pptr, cap) ({\
 	bool ret_ = false;\
@@ -279,24 +279,6 @@ static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
-static inline unsigned long ___hnv1a(const void *key, size_t len) {
-	unsigned long hash = 14695981039346656037UL;
-	for (size_t i = 0; i < len; i++) {
-		hash ^= ((unsigned char *)key)[i];
-		hash *= 1099511628211UL;
-	}
-	return hash;
-}
-
-static inline unsigned long ___hnv1az(const char *key) {
-	unsigned long hash = 14695981039346656037UL;
-	for (const char *p = key; *p; p++) {
-		hash ^= *(unsigned char *)p;
-		hash *= 1099511628211UL;
-	}
-	return hash;
-}
-
 struct ___entry_disp {
 	size_t key_sz;
 	size_t entry_sz;
@@ -320,6 +302,24 @@ struct ___entry_disp {
 		      default:		memcmp(lhs, rhs, sz)))\
 }
 
+static inline unsigned long ___hnv1a(const void *key, size_t len) {
+	unsigned long hash = 14695981039346656037UL;
+	for (size_t i = 0; i < len; i++) {
+		hash ^= ((unsigned char *)key)[i];
+		hash *= 1099511628211UL;
+	}
+	return hash;
+}
+
+static inline unsigned long ___hnv1az(const char *key) {
+	unsigned long hash = 14695981039346656037UL;
+	for (const char *p = key; *p; p++) {
+		hash ^= *(unsigned char *)p;
+		hash *= 1099511628211UL;
+	}
+	return hash;
+}
+
 /**
  * @fn bool rehash(type **pptr, size cap = 64);
  *
@@ -331,7 +331,7 @@ struct ___entry_disp {
  *
  * @return On success, `true` is returned. If the requested
  * capacity is not enought `false` is returned and the original
- * associative array does not change.
+ * associative array is left untouched.
  */
 #define rehash(pptr, cap) ({\
 	bool ret_ = false;\
@@ -779,7 +779,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 
 #define ___get_val(str, sep, next, p) ({\
 	char *tok_ = ___get_tok(str, sep, &next);\
-	*(p) = ___from_str(tok_, *(p));\
+	*(p) = ___str_to(tok_, *(p));\
 	free(tok_);\
 })
 
@@ -807,7 +807,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	return tok;
 }
 
-#define ___from_str(str, x) ({\
+#define ___str_to(str, x) ({\
 	const char *str_ = str;\
 	(str_) ? \
 	_Generic(x,\
@@ -878,7 +878,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define splitv(str, sep, pptr) ({\
 	const char *next_ = NULL;\
 	for (char *tok_ = ___get_tok(str, sep, &next_); tok_; tok_ = ___get_tok(NULL, sep, &next_)) {\
-		append(pptr, ___from_str(tok_, **(pptr)));\
+		append(pptr, ___str_to(tok_, **(pptr)));\
 		free(tok_);\
 	}\
 })
