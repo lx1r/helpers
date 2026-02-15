@@ -300,8 +300,8 @@ static inline unsigned long ___hnv1az(const char *key) {
 struct ___entry_disp {
 	size_t key_sz;
 	size_t entry_sz;
-	unsigned long (*hashfn)(const void *, size_t);
-	int (*cmprfn)(const void *, const void *, size_t);
+	unsigned long (*hash)(const void *, size_t);
+	int (*cmp)(const void *, const void *, size_t);
 };
 
 #define ___disp(pptr) &(struct ___entry_disp){\
@@ -361,27 +361,27 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 {
 	size_t cap = len(ptr);
 	if (!cap)
-		return -1;
+		return -1; /* ENOMEM */;
 
-	ssize_t slot = disp->hashfn(entry, disp->key_sz) % cap;
-	ssize_t end = (slot + cap/2) % cap; /* check only half */
+	ssize_t slot = disp->hash(entry, disp->key_sz) % cap;
+	ssize_t end = (slot + cap/2) % cap; /* force rehash */
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
 			memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
-		} else if (key_ptr && disp->cmprfn(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0) {
+		} else if (key_ptr && disp->cmp(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0) {
 			if (update) {
 				memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 				return slot;
 			}
-			return -2; /* -EEXIST */
+			return -2; /* EEXIST */
 		}
 		slot = (slot + 1) % cap;
 	} while (slot != end);
 
-	return -1; /* -ENOMEM */
+	return -1; /* ENOMEM */
 }
 
 static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t new_cap)
@@ -401,7 +401,7 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
 			if (ret == -1) {
 				free(new_ptr);
 				return NULL;
-			} /* ret == -2 is unexpected here */
+			} /* EEXIST is impossible here */
 		}
 	}
 	free(old_ptr);
@@ -498,7 +498,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = disp->hashfn(ptr + slot*disp->entry_sz, disp->key_sz) % cap;
+		ssize_t pos = disp->hash(ptr + slot*disp->entry_sz, disp->key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -560,7 +560,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 	if (!cap)
 		return -1;
 
-	ssize_t slot = disp->hashfn(key_ptr, disp->key_sz) % cap;
+	ssize_t slot = disp->hash(key_ptr, disp->key_sz) % cap;
 	ssize_t end = slot;
 
 	___lookups++;
@@ -568,7 +568,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 		___lookup_probes++;
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (disp->cmprfn(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0)
+		else if (disp->cmp(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);

@@ -24,6 +24,7 @@ int main()
 	insert(&months, "october", 10);
 	insert(&months, "november", 11);
 	insert(&months, "december", 12);
+	insert(&months, "january", -1);
 	dump_months(months);
 
 	int *month;
@@ -32,14 +33,14 @@ int main()
 	else
 		println("node not found");
 
+	update(&months, "february", -2);
+	update(&months, "april", -4);
+	update(&months, "august", -8);
 	delete(&months, lookup(&months, "january"));
-	delete(&months, lookup(&months, "february"));
 	delete(&months, lookup(&months, "march"));
-	delete(&months, lookup(&months, "april"));
 	delete(&months, lookup(&months, "may"));
 	delete(&months, lookup(&months, "june"));
 	delete(&months, lookup(&months, "july"));
-	delete(&months, lookup(&months, "august"));
 	delete(&months, lookup(&months, "september"));
 	insert(&months, "trillium", 14);
 	dump_months(months);

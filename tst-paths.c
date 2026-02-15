@@ -21,7 +21,7 @@ int main()
 	path = joinv(sep, dirs);
 	println(path);
 
-	char **ddir;
+	char **ddir = NULL;
 	splitv(path, sep, &ddir);
 
 	foreach (dir, ddir)
