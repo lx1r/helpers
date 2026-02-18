@@ -163,6 +163,24 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
 
 /**
+ * @fn void vfree(type **ptr);
+ *
+ * @brief Releases allocated memory for each element of a dynamic array.
+ *
+ * @param ptr pointer to the dynamic array, may be any type
+ */
+#define vfree(ptr) ___vfree((void **)(ptr))
+
+static inline void ___vfree(void **ptr)
+{
+	foreach (p, ptr)
+		free(*p);
+	free(ptr);
+}
+
+static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
+
+/**
  * @fn boot resize(type **pptr, size cap);
  *
  * @brief Changes the capacity of a dynamic array.
@@ -246,24 +264,6 @@ static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz
 	}\
 	slot_;\
 })
-
-/**
- * @fn void vfree(type **ptr);
- *
- * @brief Releases allocated memory for each element of a dynamic array.
- *
- * @param ptr pointer to the dynamic array, may be any type
- */
-#define vfree(ptr) ___vfree((void **)(ptr))
-
-static inline void ___vfree(void **ptr)
-{
-	foreach (p, ptr)
-		free(*p);
-	free(ptr);
-}
-
-static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
 
 /**
  * @struct entry(ktype, vtype)
