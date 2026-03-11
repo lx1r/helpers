@@ -49,7 +49,7 @@
 #define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
 #define ___clear_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] &= ~___bit_mask(nr, *(bits)))
 
-#define ___typeof(ptr) typeof(&(*(ptr)))
+#define ___typeof_ref(ptr) typeof(&(*(ptr)))
 
 #ifndef NO_LIBC
 
@@ -156,29 +156,11 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
 
 #define ___foreach0(ref, ptr) \
-	for (___typeof(ptr) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
+	for (___typeof_ref(ptr) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
 	if (___inuse(ptr, (ref) - (ptr)))
 
 #define ___foreach1(ref, ptr, n) \
-	for (___typeof(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
-
-/**
- * @fn void vfree(type **ptr);
- *
- * @brief Releases allocated memory for each element of a dynamic array.
- *
- * @param ptr pointer to the dynamic array, may be any type
- */
-#define vfree(ptr) ___vfree((void **)(ptr))
-
-static inline void ___vfree(void **ptr)
-{
-	foreach (p, ptr)
-		free(*p);
-	free(ptr);
-}
-
-static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
+	for (___typeof_ref(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
 
 /**
  * @fn boot resize(type **pptr, size cap);
@@ -264,6 +246,24 @@ static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz
 	}\
 	slot_;\
 })
+
+/**
+ * @fn void vfree(type **ptr);
+ *
+ * @brief Releases allocated memory for each element of a dynamic array.
+ *
+ * @param ptr pointer to the dynamic array, may be any type
+ */
+#define vfree(ptr) ___vfree((void **)(ptr))
+
+static inline void ___vfree(void **ptr)
+{
+	foreach (p, ptr)
+		free(*p);
+	free(ptr);
+}
+
+static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
 
 /**
  * @struct entry(ktype, vtype)
@@ -424,17 +424,13 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * NULL if something went wrong. The reference is valid until any method
  * on the associative array is called.
  */
-#define insert(pptr, k, ...) ({\
-	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
-	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
-				  &entry_.key, false);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
-})
+#define insert(pptr, k, ...) \
+	___insert_entry(pptr, false, {k, (typeof((*(pptr))->value))__VA_ARGS__})
 
 /**
  * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
  *
- * @brief Adds a a new element or update an existing element to a dynamic
+ * @brief Adds a new element or update an existing element to a dynamic
  * associative array, exapands memory usage if necessary.
  *
  * @param pptr pointer to the associative array, may be declared using
@@ -447,11 +443,14 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * NULL if something went wrong. The reference is valid until any method
  * on the associative array is called.
  */
-#define update(pptr, k, ...) ({\
-	typeof(**(pptr)) entry_ = {k, (typeof((*(pptr))->value))__VA_ARGS__};\
+#define update(pptr, k, ...) \
+	___insert_entry(pptr, true, {k, (typeof((*(pptr))->value))__VA_ARGS__})
+
+#define ___insert_entry(pptr, update, ...) ({\
+	typeof(**(pptr)) entry_ = __VA_ARGS__;\
 	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
-				  &entry_.key, true);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+				  &entry_.key, update);\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : (typeof((*(pptr))->value) *)NULL;\
 })
 
 static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
@@ -547,7 +546,7 @@ static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *valu
 #define lookup(pptr, k) ({\
 	typeof((**(pptr)).key) key_ = k;\
 	ssize_t slot_ = ___lookup((void **)pptr, ___disp(pptr), &key_);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : NULL;\
+	(slot_ != -1) ? &(*(pptr))[slot_].value : (typeof((**(pptr)).value) *)NULL;\
 })
 
 static size_t ___lookups = 0;
@@ -697,7 +696,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 	size_t len_ = len;\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	___typeof(ptr) ptr_ = ptr;\
+	___typeof_ref(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
 	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
@@ -762,7 +761,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 	size_t len_ = len;\
 	char fmt_[4 + 2 + 1];\
 	char *dst_ = fmt_;\
-	___typeof(ptr) ptr_ = ptr;\
+	___typeof_ref(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
 	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
@@ -900,7 +899,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
 
 #define map(fn, lt) ({\
-	___typeof(lt) ret_ = NULL;\
+	___typeof_ref(lt) ret_ = NULL;\
 	foreach (ref, lt) append(&ret_, fn(*ref));\
 	ret_;\
 })
