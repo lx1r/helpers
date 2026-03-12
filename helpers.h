@@ -140,6 +140,12 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
 	return ___meta(ptr)->len;
 }
 
+#define count(ptr) ({\
+	size_t count_ = 0;\
+	foreach (ref, ptr) count_++;\
+	count_;\
+})
+
 /**
  * @fn foreach (type *ref, type *ptr, size_t len = len(ptr))
  *
@@ -896,9 +902,6 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___decl10(x, ...) x; ___decl9(__VA_ARGS__)
 #define ___decl11(x, ...) x; ___decl10(__VA_ARGS__)
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
-
-#define count(lt) \
-	reduce(func((size_t a, typeof(*(lt)) b __attribute__((__unused__))), a + 1), lt)
 
 #endif /* NO_LIBC */
 #endif
