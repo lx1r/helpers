@@ -57,7 +57,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <malloc.h>
-#include <string.h>
 #include <unistd.h>
 
 /**
@@ -297,9 +296,9 @@ struct ___entry_disp {
 					\
 	func((const void *lhs, const void *rhs, size_t sz),\
 	     _Generic((**(pptr)).key,\
-		      char *:		strcmp(*(char **)lhs, *(char **)rhs),\
-		      const char *:	strcmp(*(char **)lhs, *(char **)rhs),\
-		      default:		memcmp(lhs, rhs, sz)))\
+		      char *:		__builtin_strcmp(*(char **)lhs, *(char **)rhs),\
+		      const char *:	__builtin_strcmp(*(char **)lhs, *(char **)rhs),\
+		      default:		__builtin_memcmp(lhs, rhs, sz)))\
 }
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
@@ -352,7 +351,7 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	struct meta *meta = ___meta(ptr);
 	meta->len = cap;
 	meta->ext = 1;
-	memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
+	__builtin_memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
 	return ptr;
 }
 
@@ -368,12 +367,12 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
-			memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
+			__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
 		} else if (key_ptr && disp->cmp(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0) {
 			if (update) {
-				memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
+				__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 				return slot;
 			}
 			return -2; /* EEXIST */
@@ -507,7 +506,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 		}
 
 		___inuse_set(ptr, empty);
-		memcpy(ptr + empty*disp->entry_sz, ptr + slot*disp->entry_sz, disp->entry_sz);
+		__builtin_memcpy(ptr + empty*disp->entry_sz, ptr + slot*disp->entry_sz, disp->entry_sz);
 		___inuse_clear(ptr, slot);
 		empty = slot;
 
@@ -785,23 +784,23 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 static inline char *___get_tok(const char *str, const char *sep, const char **next)
 {
 	size_t tok_len;
-	size_t sep_len = strlen(sep);
+	size_t sep_len = __builtin_strlen(sep);
 
 	if (!str)
 		str = *next;
 	if (!str)
 		return NULL;
 
-	char *next_sep = strstr(str, sep);
+	char *next_sep = __builtin_strstr(str, sep);
 	if (next_sep) {
 		tok_len = next_sep - str;
 		*next = next_sep + sep_len;
 	} else {
-		tok_len = strlen(str);
+		tok_len = __builtin_strlen(str);
 		*next = NULL;
 	}
 	char *tok = malloc(tok_len + 1);
-	memcpy(tok, str, tok_len);
+	__builtin_memcpy(tok, str, tok_len);
 	tok[tok_len] = '\0';
 	return tok;
 }
@@ -810,7 +809,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 	const char *str_ = str;\
 	(str_) ? \
 	_Generic(x,\
-		 _Bool:			strcasecmp(str_, "true") == 0 || strtoul(str_, NULL, 0),\
+		 _Bool:			strtoul(str_, NULL, 0),\
 		 char:			str_[0],\
 		 signed char:		(signed char)strtol(str_, NULL, 0),\
 		 unsigned char:		(unsigned char)strtoul(str_, NULL, 0),\
@@ -825,7 +824,7 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 		 float:			strtof(str_, NULL),\
 		 double:		strtod(str_, NULL),\
 		 long double:		strtold(str_, NULL),\
-		 char *:		strdup(str_)) : 0;\
+		 char *:		__builtin_strdup(str_)) : 0;\
 })
 
 /**
@@ -897,24 +896,6 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 #define ___decl10(x, ...) x; ___decl9(__VA_ARGS__)
 #define ___decl11(x, ...) x; ___decl10(__VA_ARGS__)
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
-
-#define map(fn, lt) ({\
-	___typeof_ref(lt) ret_ = NULL;\
-	foreach (ref, lt) append(&ret_, fn(*ref));\
-	ret_;\
-})
-
-#define filter(fn, lt) ({\
-	typeof(lt) ret_ = NULL;\
-	foreach (ref, lt) if (fn(*ref)) append(&ret_, *ref);\
-	ret_;\
-})
-
-#define reduce(fn, lt) ({\
-	typeof(fn(0, lt[0])) ret_ = 0;\
-	foreach (ref, lt) ret_ = fn(ret_, *ref);\
-	ret_;\
-})
 
 #define count(lt) \
 	reduce(func((size_t a, typeof(*(lt)) b __attribute__((__unused__))), a + 1), lt)

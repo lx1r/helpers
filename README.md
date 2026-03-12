@@ -31,13 +31,6 @@ an associative array.
 
 
 ---
-`void vfree(type **ptr);`
-
-Releases allocated memory for each element of a dynamic array.
-
-* `ptr` -  pointer to the dynamic array, may be any type
-
----
 `boot resize(type **pptr, size cap);`
 
 Changes the capacity of a dynamic array.
@@ -63,6 +56,13 @@ initializer list
 **Returns:** Index in the array where the new value is appended or `-1`
 if something went wrong, the index is valid until any method on the
 dynamic array is called.
+
+---
+`void vfree(type **ptr);`
+
+Releases allocated memory for each element of a dynamic array.
+
+* `ptr` -  pointer to the dynamic array, may be any type
 
 ---
 `entry(ktype, vtype)`
@@ -108,7 +108,7 @@ on the associative array is called.
 ---
 `vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);`
 
-Adds a a new element or update an existing element to a dynamic
+Adds a new element or update an existing element to a dynamic
 associative array, exapands memory usage if necessary.
 
 * `pptr` -  pointer to the associative array, may be declared using
