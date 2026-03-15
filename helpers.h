@@ -284,6 +284,12 @@ static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
+#define ___typeof_key(pptr) typeof((*(pptr))->key)
+#define ___typeof_value(pptr) typeof((*(pptr))->value)
+
+#define ___entry_value_ptr(pptr, slot) \
+	(slot != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
+
 struct ___entry_disp {
 	size_t key_sz;
 	size_t entry_sz;
@@ -430,7 +436,7 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * on the associative array is called.
  */
 #define insert(pptr, k, ...) \
-	___insert_entry(pptr, false, {k, (typeof((*(pptr))->value))__VA_ARGS__})
+	___insert_entry(pptr, false, {k, (___typeof_value(pptr))__VA_ARGS__})
 
 /**
  * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
@@ -449,13 +455,13 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * on the associative array is called.
  */
 #define update(pptr, k, ...) \
-	___insert_entry(pptr, true, {k, (typeof((*(pptr))->value))__VA_ARGS__})
+	___insert_entry(pptr, true, {k, (___typeof_value(pptr))__VA_ARGS__})
 
 #define ___insert_entry(pptr, update, ...) ({\
 	typeof(**(pptr)) entry_ = __VA_ARGS__;\
 	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
 				  &entry_.key, update);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : (typeof((*(pptr))->value) *)NULL;\
+	___entry_value_ptr(pptr, slot_);\
 })
 
 static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
@@ -549,9 +555,9 @@ static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *valu
  * if the key doesn't exist NULL pointer will be returned.
  */
 #define lookup(pptr, k) ({\
-	typeof((**(pptr)).key) key_ = k;\
+	___typeof_key(pptr) key_ = k;\
 	ssize_t slot_ = ___lookup((void **)pptr, ___disp(pptr), &key_);\
-	(slot_ != -1) ? &(*(pptr))[slot_].value : (typeof((**(pptr)).value) *)NULL;\
+	___entry_value_ptr(pptr, slot_);\
 })
 
 static size_t ___lookups = 0;
