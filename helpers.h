@@ -51,27 +51,36 @@
 
 #define ___typeof_ref(ptr) typeof(&(*(ptr)))
 
+#define ___builtin_len(ptr) (sizeof(ptr)/sizeof(ptr[0]))
+
 #ifndef NO_LIBC
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <malloc.h>
-#include <unistd.h>
 
 /**
- * @fn out(func)
+ * @struct _ptr
  *
- * @brief A variable attribute to define cleanup function.
- *
- * @param func a function invoked when the variable goes out of scope,
- * predefined functions: `close`, `fclose`, `free`, `vfree`.
+ * @brief An automatic pointer that invokes `free()` when leaving the scope
  */
-#define out(func) __attribute__((__cleanup__(___p##func)))
+#define _ptr *__attribute__((__cleanup__(___pfree)))
 
-static inline void ___pclose(int *pfd) { close(*pfd); }
-static inline void ___pfclose(FILE **pfp) { fclose(*pfp); }
-static inline void ___pfree(void *pptr) { free(*(void **)pptr); }
+/**
+ * @struct _vptr
+ *
+ * @brief An automatic pointer to an array that invokes `vfree()` when leaving the scope
+ */
+#define _vptr **__attribute__((__cleanup__(___pvfree)))
+
+static inline void ___pfree(void *ptr)
+{
+	void **pptr = (void **)ptr;
+
+	free(*pptr);
+	*pptr = NULL;
+}
 
 #define ___cap_sz(ptr)		malloc_usable_size(ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
@@ -125,9 +134,9 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 #define len(ptr) \
 	_Generic(&(ptr),\
 		 typeof(*(ptr)) **: ___dynamic_len,\
-		 default: ___builtin_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
+		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
-static inline size_t ___builtin_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+static inline size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
 {
 	return n / c;
 }
@@ -261,14 +270,19 @@ static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz
  */
 #define vfree(ptr) ___vfree((void **)(ptr))
 
-static inline void ___vfree(void **ptr)
+static inline void ___vfree(void **pptr)
 {
-	foreach (p, ptr)
+	foreach (p, pptr)
 		free(*p);
-	free(ptr);
+	free(pptr);
 }
 
-static inline void ___pvfree(void *pptr) { ___vfree(*(void ***)pptr); }
+static inline void ___pvfree(void *ptr)
+{
+	void ***ppptr = (void ***)ptr;
+	vfree(*ppptr);
+	*ppptr = NULL;
+}
 
 /**
  * @struct entry(ktype, vtype)
