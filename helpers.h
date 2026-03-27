@@ -61,14 +61,14 @@
 #include <malloc.h>
 
 /**
- * @struct _ptr
+ * @type _ptr
  *
  * @brief An automatic pointer that invokes `free()` when leaving the scope
  */
 #define _ptr *__attribute__((__cleanup__(___pfree)))
 
 /**
- * @struct _vptr
+ * @type _vptr
  *
  * @brief An automatic pointer to an array that invokes `vfree()` when leaving the scope
  */
@@ -285,7 +285,7 @@ static inline void ___pvfree(void *ptr)
 }
 
 /**
- * @struct entry(ktype, vtype)
+ * @type entry(ktype, vtype)
  *
  * @brief Associative array element type.
  *
