@@ -1,12 +1,14 @@
 ## Generic helpers
 
 ---
-`out(func)`
+`_ptr`
 
-A variable attribute to define cleanup function.
+An automatic pointer that invokes `free()` when leaving the scope
 
-* `func` -  a function invoked when the variable goes out of scope,
-predefined functions: `close`, `fclose`, `free`, `vfree`.
+---
+`_vptr`
+
+An automatic pointer to an array that invokes `vfree()` when leaving the scope
 
 ---
 `size_t len(void *ptr);`
