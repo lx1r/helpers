@@ -20,4 +20,4 @@ clean:
 
 README.md: helpers.h
 	@echo gen $@
-	@mdgen.sh $^ > $@
+	@mdgen.sh -d $^ > $@
