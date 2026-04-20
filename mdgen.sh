@@ -14,12 +14,12 @@ then
     for file in $*
     do
         sed -En '
-            s|^ \* (@fn )(.*)|`\2`|p
-            s|^ \* (@var )(.*)|`\2`|p
-            s|^ \* (@type )(.*)|`\2`|p
-            s|^ \* (@brief )(.*)|\2|p
-            s|^ \* (@param )([a-z0-9_.]*)(.*)|* `\2` - \3|p
-            s|^ \* (@return )(.*)|**Returns:** \2|p
+            s|^ \* @fn (.*)|`\1`|p
+            s|^ \* @var (.*)|`\1`|p
+            s|^ \* @type (.*)|`\1`|p
+            s|^ \* @brief (.*)|\1|p
+            s|^ \* @param ([a-z0-9_.]*) (.*)|* `\1` - \2|p
+            s|^ \* @return (.*)|**Returns:** \1|p
             s|^\s*(.*)[;|,]\s*\/\*\*< (.*) \*\/|* `\1` - \2|p
             s|^\/\*\*|---|p
             s|^ \* (.*)|\1|p
@@ -34,8 +34,8 @@ then
     shift
     for file in $*
     do
-        sed -En "s|(^# )(.*)|\#\#\# [\2]($file)|p" $file
-        sed -En "s|(^## )(.*)|\2|p" $file | while read -r line
+        sed -En "s|^# (.*)|\#\#\# [\1]($file)|p" $file
+        sed -En "s|^## (.*)|\1|p" $file | while read -r line
         do
             link=$(echo $line | tr "[:upper:] " "[:lower:]-")
             echo "* [$line]($file\#$link)"
@@ -51,16 +51,15 @@ then
         s|^---|<hr>|
         s|^# (.*)|<h1>\1<\/h1>|
         s|^## (.*)|<h2>\1<\/h2>|
-        s|^### (.*)|<h3>\1<\/h3>|' |\
+        s|^### (.*)|<h3>\1<\/h3>|' |
     # phase 2: code paragraphs
     sed -E '
-        /^```/{:1 N; s|```(.*)```|\n<p><code>\1<\/code><\/p>\n|; T1}' |\
+        /^```/{:1 N; s|```(.*)```|\n<p><code>\1<\/code><\/p>\n|; T1}' |
     # phase 3: paragraphs and lists
     sed -E '/./{H;$!d} ; x
-        s|^\n```(.*)```|<p><code>\1<\/code><\/p>|
         s|^(\n\* .*)|<ul>\1\n<\/ul>|
         s|^(\n[^<].*)|<p>\1\n<\/p>|
-        s|^\n(.*)|\1|' |\
+        s|^\n(.*)|\1|' |
     # phase 4: bullets and highlighting
     sed -E '
         s|^\* (.*)$|<li>\1<\/li>|
