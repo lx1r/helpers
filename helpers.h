@@ -1,7 +1,7 @@
 #ifndef ___HELPERS_H
 #define ___HELPERS_H
 
-/*
+/**
  * ## Generic helpers
  */
 
@@ -63,14 +63,14 @@
 /**
  * @type _ptr
  *
- * @brief An automatic pointer that invokes `free()` when leaving the scope
+ * @brief An automatic pointer that invokes `free()` when leaving the scope.
  */
 #define _ptr *__attribute__((__cleanup__(___pfree)))
 
 /**
  * @type _vptr
  *
- * @brief An automatic pointer to an array that invokes `vfree()` when leaving the scope
+ * @brief An automatic pointer to an array that invokes `vfree()` when leaving the scope.
  */
 #define _vptr **__attribute__((__cleanup__(___pvfree)))
 
@@ -182,8 +182,10 @@ static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused_
  * @brief Changes the capacity of a dynamic array.
  *
  * @param pptr pointer to the dynamic array, may be any type
- * @param cap requested capacity, if the array length is less
- * than the requested capacity, the length will be truncated
+ * @param cap requested capacity
+ *
+ * If the array length is less than the requested capacity,
+ * the length will be truncated.
  *
  * @return On success, `true` is returned. If the requested
  * capacity is not enought `false` is returned and the original
@@ -242,8 +244,7 @@ static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz
  * usage if necessary.
  *
  * @param pptr pointer to the dynamic array, may be any type
- * @param init initializer for a new array element, may be an aggregate
- * initializer list
+ * @param init initializer for a new array element, may be an aggregate initializer list
  *
  * @return Index in the array where the new value is appended or `-1`
  * if something went wrong, the index is valid until any method on the
@@ -289,12 +290,14 @@ static inline void ___pvfree(void *ptr)
  *
  * @brief Associative array element type.
  *
- * @param ktype associative array index (key) type, can be any built-in
- * scalar type or a pointer to a null terminated string
- * @param vtype a type of value associated with the key, can be any type
+ * @param ktype associative array index type
+ * @param vtype a type of value associated with the key
  *
- * To pass associative array pointers to functions, the associative array type
- * must be fully qualified using the `typedef` keyword.
+ * Array index can be any built-in scalar type or a pointer to a null
+ * terminated string. Array value can be any type.
+ *
+ * To pass associative array pointers to functions, the associative array
+ * type must be fully qualified using the `typedef` keyword.
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
@@ -350,8 +353,7 @@ static inline unsigned long ___hnv1az(const char *key) {
  *
  * @brief Changes the capacity of an associative array.
  *
- * @param pptr pointer to the associative array,
- * may be any type
+ * @param pptr pointer to the associative array
  * @param cap requested capacity
  *
  * @return On success, `true` is returned. If the requested
@@ -439,11 +441,9 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * @brief Adds a new element to a dynamic associative array only if it
  * did not exist, exapands memory usage if necessary.
  *
- * @param pptr pointer to the associative array, may be declared using
- * `entry` macro
- * @param key associative array index value, maybe any standard type
- * @param init initializer for a new data element, may be an aggregate
- * initializer list
+ * @param pptr pointer to the associative array, may be declared by `entry` macro
+ * @param key associative array index value
+ * @param init array value initializer, may be an aggregate initializer list
  *
  * @return Reference to the inserted data in the associative array or
  * NULL if something went wrong. The reference is valid until any method
@@ -453,16 +453,14 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
 	___insert_entry(pptr, false, {k, (___typeof_value(pptr))__VA_ARGS__})
 
 /**
- * @fn vtype *insert(entry(ktype, vtype) **pptr, ktype key, vtype init);
+ * @fn vtype *update(entry(ktype, vtype) **pptr, ktype key, vtype init);
  *
  * @brief Adds a new element or update an existing element to a dynamic
  * associative array, exapands memory usage if necessary.
  *
- * @param pptr pointer to the associative array, may be declared using
- * `entry` macro
- * @param key associative array index value, maybe any standard type
- * @param init initializer for a new data element, may be an aggregate
- * initializer list
+ * @param pptr pointer to the associative array, may be declared by `entry` macro
+ * @param key associative array index value
+ * @param init array value initializer, may be an aggregate initializer list
  *
  * @return Reference to the updated data in the associative array or
  * NULL if something went wrong. The reference is valid until any method
@@ -501,8 +499,9 @@ static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
  * @brief Removes an element from an associative array.
  *
  * @param pptr pointer to the associative array
- * @param ref reference to a data value associated with a key
- * in the array, can be returned by `lookup()` method
+ * @param ref reference to a value associated with a key
+ *
+ * Value reference can be returned by `lookup()` method.
  *
  * @return On success, `true` is returned. If `ref` is invalid
  * `false` is returned.
@@ -647,7 +646,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  * @param fp output stream
  * @param ... list of values or constants of standard type to print
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define fprint(fp, ...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
@@ -664,7 +663,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  *
  * @param ... list of values or constants of standard type to print
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define print(...) fprint(stdout, ##__VA_ARGS__)
 
@@ -676,7 +675,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  * @param fp output stream
  * @param ... list of values or constants of standard type to print
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define fprintln(fp, ...) ({\
 	char fmt_[___narg(__VA_ARGS__)*4 + 2];\
@@ -694,7 +693,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  *
  * @param ... list of values or constants of standard type to print
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define println(...) fprintln(stdout, ##__VA_ARGS__)
 
@@ -708,7 +707,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  * @param ptr array of values or constants of standard type to print
  * @param len number of elements to output, default is `len()`
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define fprintv(fp, sep, ptr, ...)\
 	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, ptr, ##__VA_ARGS__)
@@ -740,7 +739,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  * @param ptr array of values or constants of standard type to print
  * @param len number of elements to output, default is `len()`
  *
- * @return The number of bytes printed.
+ * @return The number of characters printed.
  */
 #define printv(sep, ptr, ...) fprintv(stdout, sep, ptr, ##__VA_ARGS__)
 
