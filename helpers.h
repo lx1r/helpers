@@ -293,19 +293,27 @@ static inline void ___pvfree(void *ptr)
  * @param ktype associative array index type
  * @param vtype a type of value associated with the key
  *
- * Array index can be any built-in scalar type or a pointer to a null
- * terminated string. Array value can be any type.
+ * The array index can be any built-in scalar type, a structure,
+ * or a pointer to a null value. The array value can be any type.
  *
  * To pass associative array pointers to functions, the associative array
  * type must be fully qualified using the `typedef` keyword.
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
+#define keyof(ptr, ref) ({\
+	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
+	___key_ptr(&(ptr), slot_);\
+})
+
 #define ___typeof_key(pptr) typeof((*(pptr))->key)
 #define ___typeof_value(pptr) typeof((*(pptr))->value)
 
-#define ___entry_value_ptr(pptr, slot) \
-	(slot != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
+#define ___key_ptr(pptr, slot) \
+	((slot) != -1) ? &(*(pptr))[slot].key : (___typeof_key(pptr) *)NULL;
+
+#define ___value_ptr(pptr, slot) \
+	((slot) != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
 
 struct ___entry_disp {
 	size_t key_sz;
@@ -449,8 +457,8 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * NULL if something went wrong. The reference is valid until any method
  * on the associative array is called.
  */
-#define insert(pptr, k, ...) \
-	___insert_entry(pptr, false, {k, (___typeof_value(pptr))__VA_ARGS__})
+#define insert(pptr, ...) \
+	___insert_entry(pptr, false, {__VA_ARGS__})
 
 /**
  * @fn vtype *update(entry(ktype, vtype) **pptr, ktype key, vtype init);
@@ -466,14 +474,14 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
  * NULL if something went wrong. The reference is valid until any method
  * on the associative array is called.
  */
-#define update(pptr, k, ...) \
-	___insert_entry(pptr, true, {k, (___typeof_value(pptr))__VA_ARGS__})
+#define update(pptr, ...) \
+	___insert_entry(pptr, true, {__VA_ARGS__})
 
 #define ___insert_entry(pptr, update, ...) ({\
 	typeof(**(pptr)) entry_ = __VA_ARGS__;\
 	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
 				  &entry_.key, update);\
-	___entry_value_ptr(pptr, slot_);\
+	___value_ptr(pptr, slot_);\
 })
 
 static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
@@ -538,15 +546,24 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 	} while (slot != end);
 }
 
+static inline ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
+{
+	size_t cap = len(ptr);
+	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / entry_sz;
+
+	if (slot < 0 || slot >= cap)
+		return -1;
+	if (!___inuse_test(ptr, slot))
+		return -1;
+
+	return slot;
+}
+
 static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *value_ptr)
 {
 	void *ptr = *pptr;
-	size_t cap = len(ptr);
-
-	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / disp->entry_sz;
-	if (slot < 0 || slot >= cap)
-		return false;
-	if (!___inuse_test(ptr, slot))
+	ssize_t slot = ___get_slot(ptr, disp->entry_sz, value_ptr);
+	if (slot == -1)
 		return false;
 
 	___inuse_clear(ptr, slot);
@@ -567,10 +584,10 @@ static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *valu
  * the reference is valid until any associative array method is called,
  * if the key doesn't exist NULL pointer will be returned.
  */
-#define lookup(pptr, k) ({\
-	___typeof_key(pptr) key_ = k;\
+#define lookup(pptr, ...) ({\
+	___typeof_key(pptr) key_ = __VA_ARGS__;\
 	ssize_t slot_ = ___lookup((void **)pptr, ___disp(pptr), &key_);\
-	___entry_value_ptr(pptr, slot_);\
+	___value_ptr(pptr, slot_);\
 })
 
 static size_t ___lookups = 0;
