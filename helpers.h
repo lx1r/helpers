@@ -357,7 +357,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 }
 
 /**
- * @fn bool rehash(type **pptr, size cap = 64);
+ * @fn bool rehash(entry(ktype, vtype) **pptr, size cap = 64);
  *
  * @brief Changes the capacity of an associative array.
  *
