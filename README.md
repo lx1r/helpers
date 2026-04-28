@@ -76,8 +76,8 @@ Associative array element type.
 * `ktype` - associative array index type
 * `vtype` - a type of value associated with the key
 
-Array index can be any built-in scalar type or a pointer to a null
-terminated string. Array value can be any type.
+The array index can be any built-in scalar type, a structure,
+or a pointer to a null value. The array value can be any type.
 
 To pass associative array pointers to functions, the associative array
 type must be fully qualified using the `typedef` keyword.
