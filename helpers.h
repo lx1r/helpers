@@ -26,28 +26,6 @@
 	___nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#define ___fill0(ptr, i)
-#define ___fill1(ptr, i, x) (ptr)[i] = (x)
-#define ___fill2(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill1(ptr, i + 1, __VA_ARGS__)
-#define ___fill3(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill2(ptr, i + 1, __VA_ARGS__)
-#define ___fill4(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill3(ptr, i + 1, __VA_ARGS__)
-#define ___fill5(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill4(ptr, i + 1, __VA_ARGS__)
-#define ___fill6(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill5(ptr, i + 1, __VA_ARGS__)
-#define ___fill7(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill6(ptr, i + 1, __VA_ARGS__)
-#define ___fill8(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill7(ptr, i + 1, __VA_ARGS__)
-#define ___fill9(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill8(ptr, i + 1, __VA_ARGS__)
-#define ___fill10(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill9(ptr, i + 1, __VA_ARGS__)
-#define ___fill11(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill10(ptr, i + 1, __VA_ARGS__)
-#define ___fill12(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill11(ptr, i + 1, __VA_ARGS__)
-
-#define ___fill(ptr, ...)\
-	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
-
-#define ___fill_shift(ptr, ...) ({\
-	___fill(ptr, __VA_ARGS__);\
-	(ptr) += ___narg(__VA_ARGS__);\
-})
-
 #define ___nr_bits(x)		(sizeof(x) * 8)
 #define ___bit_mask(nr, x)	(((typeof(x))1) << ((nr) % ___nr_bits(x)))
 #define ___bit_word(nr, x)	((nr) / ___nr_bits(x))
@@ -310,12 +288,12 @@ static inline void ___pvfree(void *ptr)
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
-#define ___key(entry) (entry)
-
 #define keyof(ptr, ref) ({\
 	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
 	___key_ptr(&(ptr), slot_);\
 })
+
+#define ___key(entry) (entry)
 
 #define ___typeof_key(pptr) typeof((*(pptr))->key)
 #define ___typeof_value(pptr) typeof((*(pptr))->value)
@@ -628,6 +606,29 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 	return -1;
 }
 
+#define ___fill0(ptr, i)
+#define ___fill1(ptr, i, x) (ptr)[i] = (x)
+#define ___fill2(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill1(ptr, i + 1, __VA_ARGS__)
+#define ___fill3(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill2(ptr, i + 1, __VA_ARGS__)
+#define ___fill4(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill3(ptr, i + 1, __VA_ARGS__)
+#define ___fill5(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill4(ptr, i + 1, __VA_ARGS__)
+#define ___fill6(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill5(ptr, i + 1, __VA_ARGS__)
+#define ___fill7(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill6(ptr, i + 1, __VA_ARGS__)
+#define ___fill8(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill7(ptr, i + 1, __VA_ARGS__)
+#define ___fill9(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill8(ptr, i + 1, __VA_ARGS__)
+#define ___fill10(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill9(ptr, i + 1, __VA_ARGS__)
+#define ___fill11(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill10(ptr, i + 1, __VA_ARGS__)
+#define ___fill12(ptr, i, x, ...) ___fill1(ptr, i, x); ___fill11(ptr, i + 1, __VA_ARGS__)
+
+#define ___fill(ptr, ...)\
+	___apply(___fill, ___narg(__VA_ARGS__))(ptr, 0, ##__VA_ARGS__)
+
+#define ___fill_shift(ptr, ...) ({\
+	___fill(ptr, __VA_ARGS__);\
+	(ptr) += ___narg(__VA_ARGS__);\
+})
+
+
 #define ___fill_pr_fmt(ptr, x)\
 	_Generic(x,\
 		 _Bool:			___fill_shift(ptr, '%', 'd'),\
@@ -642,9 +643,9 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 		 unsigned long:		___fill_shift(ptr, '%', 'l', 'u'),\
 		 signed long long:	___fill_shift(ptr, '%', 'l', 'l', 'i'),\
 		 unsigned long long:	___fill_shift(ptr, '%', 'l', 'l', 'u'),\
-		 float:			___fill_shift(ptr, '%', 'f'),\
-		 double:		___fill_shift(ptr, '%', 'f'),\
-		 long double:		___fill_shift(ptr, '%', 'L', 'f'),\
+		 float:			___fill_shift(ptr, '%', '.', '2', 'f'),\
+		 double:		___fill_shift(ptr, '%', '.', '4', 'f'),\
+		 long double:		___fill_shift(ptr, '%', '.', '4', 'L', 'f'),\
 		 char *:		___fill_shift(ptr, '%', 's'),\
 		 const char *:		___fill_shift(ptr, '%', 's'),\
 		 volatile char *:	___fill_shift(ptr, '%', 's'),\
@@ -741,8 +742,8 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 #define fprintv(fp, sep, ptr, ...)\
 	___apply(fprintv, ___narg(__VA_ARGS__))(fp, sep, ptr, ##__VA_ARGS__)
 
-#define fprintv1(fp, sep, ptr, len) ___fprintv(fp, sep, ptr, len)
 #define fprintv0(fp, sep, ptr) fprintv1(fp, sep, ptr, len(ptr))
+#define fprintv1(fp, sep, ptr, len) ___fprintv(fp, sep, ptr, len)
 
 #define ___fprintv(fp, sep, ptr, len) ({\
 	int nb_ = 0;\
@@ -806,8 +807,8 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 #define joinv(sep, ptr, ...)\
 	___apply(joinv, ___narg(__VA_ARGS__))(sep, ptr, ##__VA_ARGS__)
 
-#define joinv1(sep, ptr, len) ___joinv(sep, ptr, len)
 #define joinv0(sep, ptr) joinv1(sep, ptr, len(ptr))
+#define joinv1(sep, ptr, len) ___joinv(sep, ptr, len)
 
 #define ___joinv(sep, ptr, len) ({\
 	int nb_ = 0;\

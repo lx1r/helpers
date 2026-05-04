@@ -1,13 +1,13 @@
 #include "helpers.h"
 
 struct key {
-	int id;
+	short id;
 	int type;
 };
 
 struct val {
-	int data;
-	int config;
+	int conf;
+	float data;
 };
 
 int main()
@@ -21,13 +21,13 @@ int main()
 	foreach (ref, map)
 		println("slot=", ref - map,
 			" key=", ref->key.id, ":", ref->key.type,
-			" val=", ref->value.data, ":", ref->value.config);
+			" val=", ref->value.conf, ":", ref->value.data);
 
 	struct val *val = lookup(&map, {1, 11});
 	if (val) {
 		struct key *key = keyof(map, val);
 		println("found key=", key->id, ":", key->type,
-			" val=", val->data, ":", val->config);
+			" val=", val->conf, ":", val->data);
 	}
 
 	return 0;
