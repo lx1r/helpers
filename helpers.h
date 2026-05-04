@@ -4,7 +4,7 @@
 /**
  * ## Generic helpers
  *
- * The library provides C generic helpers for:
+ * The library provides C generic helpers for
  *
  * * Dynamically growable arrays of any type
  * * Associative arrays holding unique keys associated with specific values
