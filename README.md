@@ -2,6 +2,7 @@
 ## Generic helpers
 
 The library provides C generic helpers for:
+
 * Dynamically growable arrays of any type
 * Associative arrays holding unique keys associated with specific values
 * Outputing a list of variables of any built-in type to a file
