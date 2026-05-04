@@ -3,6 +3,13 @@
 
 /**
  * ## Generic helpers
+ *
+ * The library provides C generic helpers for:
+ * * Dynamically growable arrays of any type
+ * * Associative arrays holding unique keys associated with specific values
+ * * Outputing a list of variables of any built-in type to a file
+ * * Converting a list of variables of any built-in type to a string
+ * * Tokenizing string into a list of variables of any built-in type
  */
 
 #ifndef ___concat
@@ -121,7 +128,7 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 }
 
 /**
- * @fn size_t len(void *ptr);
+ * @fn size_t len(type *ptr);
  *
  * @brief Returns the number of elements in a static, a variable-length or
  * dynamically growable array. For associative array the function returns
@@ -136,13 +143,15 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 		 typeof(*(ptr)) **: ___dynamic_len,\
 		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
-static inline size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+static inline __attribute__((pure))
+size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
 {
 	return n / c;
 }
 
-static inline size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
-				    size_t n __attribute__((__unused__)))
+static inline __attribute__((pure))
+size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
+		      size_t n __attribute__((__unused__)))
 {
 	if (!ptr)
 		return 0;
@@ -301,6 +310,8 @@ static inline void ___pvfree(void *ptr)
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
+#define ___key(entry) (entry)
+
 #define keyof(ptr, ref) ({\
 	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
 	___key_ptr(&(ptr), slot_);\
@@ -398,7 +409,7 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 	if (!cap)
 		return -1; /* ENOMEM */;
 
-	ssize_t slot = disp->hash(entry, disp->key_sz) % cap;
+	ssize_t slot = disp->hash(___key(entry), disp->key_sz) % cap;
 	ssize_t end = (slot + cap/2) % cap; /* force rehash */
 
 	do {
@@ -406,7 +417,8 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 			__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
-		} else if (key_ptr && disp->cmp(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0) {
+		} else if (key_ptr && disp->cmp(___key(ptr + slot*disp->entry_sz),
+						key_ptr, disp->key_sz) == 0) {
 			if (update) {
 				__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
 				return slot;
@@ -529,7 +541,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = disp->hash(ptr + slot*disp->entry_sz, disp->key_sz) % cap;
+		ssize_t pos = disp->hash(___key(ptr + slot*disp->entry_sz), disp->key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -608,7 +620,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 		___lookup_probes++;
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (disp->cmp(ptr + slot*disp->entry_sz, key_ptr, disp->key_sz) == 0)
+		else if (disp->cmp(___key(ptr + slot*disp->entry_sz), key_ptr, disp->key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);
