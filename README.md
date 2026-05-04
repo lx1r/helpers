@@ -1,6 +1,13 @@
 ---
 ## Generic helpers
 
+The library provides C generic helpers for:
+* Dynamically growable arrays of any type
+* Associative arrays holding unique keys associated with specific values
+* Outputing a list of variables of any built-in type to a file
+* Converting a list of variables of any built-in type to a string
+* Tokenizing string into a list of variables of any built-in type
+
 ---
 `_ptr`
 
@@ -12,7 +19,7 @@ An automatic pointer that invokes `free()` when leaving the scope.
 An automatic pointer to an array that invokes `vfree()` when leaving the scope.
 
 ---
-`size_t len(void *ptr);`
+`size_t len(type *ptr);`
 
 Returns the number of elements in a static, a variable-length or
 dynamically growable array. For associative array the function returns
@@ -83,7 +90,7 @@ To pass associative array pointers to functions, the associative array
 type must be fully qualified using the `typedef` keyword.
 
 ---
-`bool rehash(type **pptr, size cap = 64);`
+`bool rehash(entry(ktype, vtype) **pptr, size cap = 64);`
 
 Changes the capacity of an associative array.
 
