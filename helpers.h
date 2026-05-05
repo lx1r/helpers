@@ -1,13 +1,13 @@
 #ifndef ___HELPERS_H
 #define ___HELPERS_H
 
-/**
+/*
  * ## Generic helpers
  *
  * The library provides C generic helpers for
  *
  * * Dynamically growable arrays of any type
- * * Associative arrays holding unique keys associated with specific values
+ * * Associative arrays with keys and values of any type
  * * Outputing a list of variables of any built-in type to a file
  * * Converting a list of variables of any built-in type to a string
  * * Tokenizing string into a list of variables of any built-in type
@@ -46,19 +46,23 @@
 #include <stdbool.h>
 #include <malloc.h>
 
+/*
+ * ### Pointers with scope lifetime
+ */
+
 /**
- * @type _ptr
+ * @type ptr(var)
  *
  * @brief An automatic pointer that invokes `free()` when leaving the scope.
  */
-#define _ptr *__attribute__((__cleanup__(___pfree)))
+#define ptr(var) *__attribute__((__cleanup__(___pfree))) var
 
 /**
- * @type _vptr
+ * @type pptr(var)
  *
- * @brief An automatic pointer to an array that invokes `vfree()` when leaving the scope.
+ * @brief An automatic pointer to an array of pointers that invokes `vfree()` when leaving the scope.
  */
-#define _vptr **__attribute__((__cleanup__(___pvfree)))
+#define pptr(var) **__attribute__((__cleanup__(___pvfree))) var
 
 static inline void ___pfree(void *ptr)
 {
@@ -105,6 +109,10 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 	return !meta->ext ||
 		___test_bit(slot, ___inuse_bits(meta));
 }
+
+/*
+ * ### Array helpers
+ */
 
 /**
  * @fn size_t len(type *ptr);
@@ -163,6 +171,10 @@ size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
 
 #define ___foreach1(ref, ptr, n) \
 	for (___typeof_ref(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
+
+/*
+ * ### Dynamic arrays
+ */
 
 /**
  * @fn boot resize(type **pptr, size cap);
@@ -272,6 +284,10 @@ static inline void ___pvfree(void *ptr)
 	vfree(*ppptr);
 	*ppptr = NULL;
 }
+
+/*
+ * ### Associative arrays
+ */
 
 /**
  * @type entry(ktype, vtype)
@@ -386,7 +402,7 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 {
 	size_t cap = len(ptr);
 	if (!cap)
-		return -1; /* ENOMEM */;
+		return -1; /* ENOSPC */;
 
 	ssize_t slot = disp->hash(___key(entry), disp->key_sz) % cap;
 	ssize_t end = (slot + cap/2) % cap; /* force rehash */
@@ -398,16 +414,15 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 			return slot;
 		} else if (key_ptr && disp->cmp(___key(ptr + slot*disp->entry_sz),
 						key_ptr, disp->key_sz) == 0) {
-			if (update) {
+			if (update)
 				__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
-				return slot;
-			}
-			return -2; /* EEXIST */
+			/* EEXIST */
+			return slot;
 		}
 		slot = (slot + 1) % cap;
 	} while (slot != end);
 
-	return -1; /* ENOMEM */
+	return -1; /* ENOSPC */
 }
 
 static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t new_cap)
@@ -418,16 +433,17 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
 
 	void *new_ptr = ___reserve_ext(new_cap, disp->entry_sz);
 	if (!new_ptr)
-		return NULL;
+		return NULL; /* ENOMEM */
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
 			ssize_t ret = ___try_insert(new_ptr, disp, old_ptr + slot*disp->entry_sz,
 						    NULL, false);
-			if (ret == -1) {
+			if (ret < 0) {
 				free(new_ptr);
-				return NULL;
-			} /* EEXIST is impossible here */
+				return NULL; /* ENOSPC */
+				/* EEXIST is impossible here */
+			}
 		}
 	}
 	free(old_ptr);
@@ -483,9 +499,8 @@ static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
 		ssize_t slot = ___try_insert(ptr, disp, entry, key_ptr, update);
 		if (slot >= 0)
 			return slot;
-		else if (slot == -2)
-			break; /* EEXIST */
-		ptr = ___rehash(ptr, disp, 2*len(ptr));
+		ptr = ___rehash(ptr, disp, 2 * len(ptr));
+		/* FIXME check ENOSPC */
 		if (ptr) *pptr = ptr;
 	} while (ptr);
 
@@ -543,9 +558,9 @@ static inline ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
 	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / entry_sz;
 
 	if (slot < 0 || slot >= cap)
-		return -1;
+		return -1; /* EINVAL */
 	if (!___inuse_test(ptr, slot))
-		return -1;
+		return -1; /* EFAULT */
 
 	return slot;
 }
@@ -606,6 +621,10 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 
 	return -1;
 }
+
+/*
+ * ### Output helpers
+ */
 
 #define ___fill0(ptr, i)
 #define ___fill1(ptr, i, x) (ptr)[i] = (x)
@@ -774,6 +793,10 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
  */
 #define printv(sep, ptr, ...) fprintv(stdout, sep, ptr, ##__VA_ARGS__)
 
+/*
+ * ### String conversion
+ */
+
 /**
  * @fn char *join(...);
  *
@@ -882,6 +905,10 @@ static inline char *___get_tok(const char *str, const char *sep, const char **ne
 		 long double:		strtold(str_, NULL),\
 		 char *:		__builtin_strdup(str_)) : 0;\
 })
+
+/*
+ * ### String tokenization
+ */
 
 /**
  * @fn void split(const char *str, const char *sep, ...);
