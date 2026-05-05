@@ -11,14 +11,20 @@ The library provides C generic helpers for
 ### Pointers with scope lifetime
 
 ---
-`ptr(var)`
+`type ptr(var);`
 
 An automatic pointer that invokes `free()` when leaving the scope.
 
+* `type` - pointer type
+* `var` - variable name
+
 ---
-`pptr(var)`
+`pptr(var);`
 
 An automatic pointer to an array of pointers that invokes `vfree()` when leaving the scope.
+
+* `type` - pointer type
+* `var` - variable name
 
 ### Array helpers
 
