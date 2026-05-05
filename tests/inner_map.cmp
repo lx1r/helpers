@@ -1,20 +1,18 @@
+main:3
+hi:3
+hi:timer:1
+hi:net:4
+hi:sched:7
+low:2
+low:timer:20
+low:sched:25
+medium:2
+medium:net:11
+medium:rcu:14
 no none:none
-no hardirq:none
-no softirq:none
-found hardirq:reschedule:0
-found hardirq:call_func:1
-found hardirq:cpu_stop:2
-found hardirq:cpu_crash_stop:3
-found hardirq:timer:4
-found hardirq:irq_work:5
-found hardirq:wakeup:6
-found softirq:hi:0
-found softirq:timer:1
-found softirq:net_tx:2
-found softirq:net_rx:3
-found softirq:block:4
-found softirq:irq_poll:5
-found softirq:tasklet:6
-found softirq:sched:7
-found softirq:hrtimer:8
-found softirq:rcu:9
+no hi:none
+no low:none
+no medium:none
+found hi:timer:1
+found low:sched:25
+found medium:net:11

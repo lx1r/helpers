@@ -1,23 +1,26 @@
----
 ## Generic helpers
 
 The library provides C generic helpers for
 
 * Dynamically growable arrays of any type
-* Associative arrays holding unique keys associated with specific values
+* Associative arrays with keys and values of any type
 * Outputing a list of variables of any built-in type to a file
 * Converting a list of variables of any built-in type to a string
 * Tokenizing string into a list of variables of any built-in type
 
+### Pointers with scope lifetime
+
 ---
-`_ptr`
+`ptr(var)`
 
 An automatic pointer that invokes `free()` when leaving the scope.
 
 ---
-`_vptr`
+`pptr(var)`
 
-An automatic pointer to an array that invokes `vfree()` when leaving the scope.
+An automatic pointer to an array of pointers that invokes `vfree()` when leaving the scope.
+
+### Array helpers
 
 ---
 `size_t len(type *ptr);`
@@ -40,6 +43,8 @@ an associative array.
 * `ptr` - pointer to an array
 * `len` - number of elements to iterate, default is `len(ptr)`
 
+
+### Dynamic arrays
 
 ---
 `boot resize(type **pptr, size cap);`
@@ -75,6 +80,8 @@ dynamic array is called.
 Releases allocated memory for each element of a dynamic array.
 
 * `ptr` - pointer to the dynamic array, may be any type
+
+### Associative arrays
 
 ---
 `entry(ktype, vtype)`
@@ -155,6 +162,8 @@ Searches a data associated with a key.
 the reference is valid until any associative array method is called,
 if the key doesn't exist NULL pointer will be returned.
 
+### Output helpers
+
 ---
 `int fprint(FILE *fp, ...);`
 
@@ -216,6 +225,8 @@ Print an array to the standard output stream.
 
 **Returns:** The number of characters printed.
 
+### String conversion
+
 ---
 `char *join(...);`
 
@@ -235,6 +246,8 @@ Concatenates an array into a single string.
 * `len` - number of elements to join, default is `len(ptr)`
 
 **Returns:** The pointer to joined string, should be released by calling `free()`.
+
+### String tokenization
 
 ---
 `void split(const char *str, const char *sep, ...);`

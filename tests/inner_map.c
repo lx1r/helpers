@@ -1,72 +1,55 @@
 #include "helpers.h"
 
-typedef entry(const char * /* event name */, unsigned long /* event id */) event_map;
-entry(const char * /* provider name */, event_map *) *providers = NULL;
+typedef entry(const char * /* inner key */, int  /* inner val */) inner_map_t;
+typedef entry(const char * /* inner map name */, inner_map_t *) map_t;
 
-int add_event_list(const char *provider, size_t len, const char *list[len])
+int *insert_inner(map_t **map, const char *name, const char *key, int val)
 {
-	event_map **evs = insert(&providers, provider, NULL);
-	if (!evs)
-		return -1;
-
-	for (size_t i = 0 ; i < len; i++)
-		insert(evs, list[i], i);
-
-	return 0;
+	inner_map_t **inner_map = insert(map, name, NULL);
+	return insert(inner_map, key, val);
 }
 
-unsigned long get_event_id(const char *provider, const char *event)
+unsigned long lookup_inner(map_t **map, const char *name, const char *key)
 {
-	event_map **evs = lookup(&providers, provider);
-	if (evs) {
-		unsigned long *cf = lookup(evs, event);
-		if (cf) {
-			println("found ", provider, ":", event, ":", *cf);
-			return *cf;
+	inner_map_t **inner_map = lookup(map, name);
+	if (inner_map) {
+		int *ref = lookup(inner_map, key);
+		if (ref) {
+			println("found ", name, ":", key, ":", *ref);
+			return *ref;
 		}
 	}
-	println("no ", provider, ":", event);
+	println("no ", name, ":", key);
 	return -1;
 }
 
-static const char *hardirq_list[] = {
-	"reschedule",
-	"call_func",
-	"cpu_stop",
-	"cpu_crash_stop",
-	"timer",
-	"irq_work",
-	"wakeup",
-};
-
-static const char *softirq_list[] = {
-	"hi",
-	"timer",
-	"net_tx",
-	"net_rx",
-	"block",
-	"irq_poll",
-	"tasklet",
-	"sched",
-	"hrtimer",
-	"rcu",
-};
-
 int main(void)
 {
-	add_event_list("hardirq", len(hardirq_list), hardirq_list);
-	add_event_list("softirq", len(softirq_list), softirq_list);
+	map_t *map = NULL;
 
-	get_event_id("none", "none");
+	insert_inner(&map, "hi", "timer", 1);
+	insert_inner(&map, "hi", "net", 4);
+	insert_inner(&map, "hi", "sched", 7);
+	insert_inner(&map, "low", "timer", 20);
+	insert_inner(&map, "low", "sched", 25);
+	insert_inner(&map, "medium", "net", 11);
+	insert_inner(&map, "medium", "rcu", 14);
 
-	foreach (ev, providers)
-		get_event_id(ev->key, "none");
+	println("main:", count(map));
+	foreach (mp, map) {
+		println(mp->key, ":", count(mp->value));
+		foreach (in, mp->value)
+			println(mp->key, ":", in->key, ":", in->value);
+	}
 
-	foreach (np, hardirq_list)
-		get_event_id("hardirq", *np);
+	lookup_inner(&map, "none", "none");
 
-	foreach (np, softirq_list)
-		get_event_id("softirq", *np);
+	foreach (mp, map)
+		lookup_inner(&map, mp->key, "none");
+
+	lookup_inner(&map, "hi", "timer");
+	lookup_inner(&map, "low", "sched");
+	lookup_inner(&map, "medium", "net");
 
 	return 0;
 }

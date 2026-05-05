@@ -23,7 +23,7 @@ void register_event(void)
 	static int count = 0;
 
 	int *data = insert(&event_map, ev, count);
-	if (!data) {
+	if (*data != count) {
 		println("event ", ev, " already registered");
 		return;
 	}

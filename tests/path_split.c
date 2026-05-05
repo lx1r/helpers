@@ -4,7 +4,7 @@ int main()
 {
 	char *sep = "//";
 
-	char _ptr path = join("path", sep, "to", sep, "dir");
+	char ptr(path) = join("path", sep, "to", sep, "dir");
 	println(path);
 
 	char *dirs[3];
@@ -17,10 +17,10 @@ int main()
 	foreach (dir, dirs)
 		free(*dir);
 
-	char _ptr path2 = joinv(sep, dirs);
+	char ptr(path2) = joinv(sep, dirs);
 	println(path2);
 
-	char _vptr ddir = NULL;
+	char pptr(ddir) = NULL;
 	splitv(path2, sep, &ddir);
 
 	foreach (dir, ddir)
