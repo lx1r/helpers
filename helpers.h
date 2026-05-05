@@ -6,11 +6,11 @@
  *
  * The library provides C generic helpers for
  *
- * * Dynamically growable arrays of any type
+ * * Dynamically growable arrays of arbitrary type
  * * Associative arrays with keys and values of any type
- * * Outputing a list of variables of any built-in type to a file
- * * Converting a list of variables of any built-in type to a string
- * * Tokenizing string into a list of variables of any built-in type
+ * * Outputing a list of variables a built-in type to a file
+ * * Converting a list of variables a built-in type to a string
+ * * Tokenizing string into a list of variables a built-in type
  */
 
 #ifndef ___concat
@@ -177,7 +177,7 @@ size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
  */
 
 /**
- * @fn boot resize(type **pptr, size cap);
+ * @fn boot reserve(type **pptr, size_t cap);
  *
  * @brief Changes the capacity of a dynamic array.
  *
@@ -188,12 +188,12 @@ size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
  * the length will be truncated.
  *
  * @return On success, `true` is returned. If the requested
- * capacity is not enought `false` is returned and the original
+ * capacity cannot be allocated then `false` is returned and the original
  * dynamic array is left untouched.
  */
-#define resize(pptr, cap) ({\
+#define reserve(pptr, cap) ({\
 	bool ret_ = false;\
-	typeof(*(pptr)) ptr_ = ___resize(*(void **)pptr, cap, sizeof(**(pptr)));\
+	typeof(*(pptr)) ptr_ = ___reserve(*(void **)pptr, cap, sizeof(**(pptr)));\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
@@ -201,7 +201,7 @@ size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
 	ret_;\
 })
 
-static inline void *___resize(void *old_ptr, size_t new_cap, size_t entry_sz)
+static inline void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
@@ -229,7 +229,7 @@ static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz
 
 	if (new_len > old_cap) {
 		size_t new_cap = old_cap ? old_cap + old_cap/4 : 0;
-		ptr = ___resize(old_ptr, new_cap, entry_sz);
+		ptr = ___reserve(old_ptr, new_cap, entry_sz);
 	}
 	if (ptr)
 		___meta(ptr)->len = new_len;

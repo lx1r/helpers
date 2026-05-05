@@ -2,11 +2,11 @@
 
 The library provides C generic helpers for
 
-* Dynamically growable arrays of any type
+* Dynamically growable arrays of arbitrary type
 * Associative arrays with keys and values of any type
-* Outputing a list of variables of any built-in type to a file
-* Converting a list of variables of any built-in type to a string
-* Tokenizing string into a list of variables of any built-in type
+* Outputing a list of variables a built-in type to a file
+* Converting a list of variables a built-in type to a string
+* Tokenizing string into a list of variables a built-in type
 
 ### Pointers with scope lifetime
 
@@ -47,7 +47,7 @@ an associative array.
 ### Dynamic arrays
 
 ---
-`boot resize(type **pptr, size cap);`
+`boot reserve(type **pptr, size_t cap);`
 
 Changes the capacity of a dynamic array.
 
@@ -58,7 +58,7 @@ If the array length is less than the requested capacity,
 the length will be truncated.
 
 **Returns:** On success, `true` is returned. If the requested
-capacity is not enought `false` is returned and the original
+capacity cannot be allocated then `false` is returned and the original
 dynamic array is left untouched.
 
 ---
