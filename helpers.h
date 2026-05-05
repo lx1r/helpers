@@ -6,11 +6,11 @@
  *
  * The library provides C generic helpers for
  *
- * * Dynamically growable arrays of arbitrary type
- * * Associative arrays with keys and values of any type
- * * Outputing a list of variables a built-in type to a file
- * * Converting a list of variables a built-in type to a string
- * * Tokenizing string into a list of variables a built-in type
+ * * [Dynamically growable arrays of arbitrary type](#dynamic-arrays)
+ * * [Associative arrays with keys and values of any type](#associative-arrays)
+ * * [Outputing a list of variables a built-in type to a file](#output-helpers)
+ * * [Converting a list of variables a built-in type to a string](#string-conversion)
+ * * [Tokenizing string into a list of variables a built-in type](#string-tokenization)
  */
 
 #ifndef ___concat
@@ -76,17 +76,17 @@ static inline void ___pfree(void *ptr)
 #define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
 #define ___INITIAL_LEN		___nr_bits(unsigned long)
 
-struct meta {
+struct ___meta {
 	size_t len:__SIZE_WIDTH__ - 1;
 	size_t ext:1;
 };
 
-static inline struct meta *___meta(void *ptr)
+static inline struct ___meta *___meta(void *ptr)
 {
-	return ptr + ___cap_sz(ptr) - sizeof(struct meta);
+	return ptr + ___cap_sz(ptr) - sizeof(struct ___meta);
 }
 
-static inline unsigned long *___inuse_bits(struct meta *meta)
+static inline unsigned long *___inuse_bits(struct ___meta *meta)
 {
 	if (!meta->ext)
 		return NULL;
@@ -104,7 +104,7 @@ static inline unsigned long *___inuse_bits(struct meta *meta)
 
 static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
-	struct meta *meta = ___meta(ptr);
+	struct ___meta *meta = ___meta(ptr);
 
 	return !meta->ext ||
 		___test_bit(slot, ___inuse_bits(meta));
@@ -207,7 +207,7 @@ static inline void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct meta));
+	void *ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct ___meta));
 	if (!ptr)
 		return NULL;
 
@@ -215,7 +215,7 @@ static inline void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 	if (old_len > new_cap)
 		old_len = new_cap;
 
-	struct meta *meta = ___meta(ptr);
+	struct ___meta *meta = ___meta(ptr);
 	meta->len = old_len;
 	meta->ext = 0;
 
@@ -224,7 +224,7 @@ static inline void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 
 static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz)
 {
-	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct meta)) / entry_sz : 0;
+	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct ___meta)) / entry_sz : 0;
 	void *ptr = old_ptr;
 
 	if (new_len > old_cap) {
@@ -321,14 +321,14 @@ static inline void ___pvfree(void *ptr)
 #define ___value_ptr(pptr, slot) \
 	((slot) != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
 
-struct ___entry_disp {
+struct ___entry_meta {
 	size_t key_sz;
 	size_t entry_sz;
 	unsigned long (*hash)(const void *, size_t);
 	int (*cmp)(const void *, const void *, size_t);
 };
 
-#define ___disp(pptr) &(struct ___entry_disp){\
+#define ___entry_meta(pptr) &(struct ___entry_meta){\
 	sizeof((**(pptr)).key),\
 	sizeof(**(pptr)),\
 	func((const void *key_ptr, size_t key_sz),\
@@ -377,7 +377,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 #define rehash(pptr, cap) ({\
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_;\
-	ptr_ = ___rehash(*(void **)pptr, ___disp(pptr), cap);\
+	ptr_ = ___rehash(*(void **)pptr, ___entry_meta(pptr), cap);\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
@@ -387,35 +387,35 @@ static inline unsigned long ___hnv1az(const char *key) {
 
 static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 {
-	void *ptr = malloc(entry_sz*cap + sizeof(struct meta) + ___inuse_sz(cap));
+	void *ptr = malloc(entry_sz*cap + sizeof(struct ___meta) + ___inuse_sz(cap));
 	if (!ptr)
 		return NULL;
-	struct meta *meta = ___meta(ptr);
+	struct ___meta *meta = ___meta(ptr);
 	meta->len = cap;
 	meta->ext = 1;
 	__builtin_memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
 	return ptr;
 }
 
-static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void *entry,
+static inline ssize_t ___try_insert(void *ptr, struct ___entry_meta *meta, void *entry,
 				    void *key_ptr, bool update)
 {
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1; /* ENOSPC */;
 
-	ssize_t slot = disp->hash(___key(entry), disp->key_sz) % cap;
+	ssize_t slot = meta->hash(___key(entry), meta->key_sz) % cap;
 	ssize_t end = (slot + cap/2) % cap; /* force rehash */
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
-			__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
+			__builtin_memcpy(ptr + slot*meta->entry_sz, entry, meta->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
-		} else if (key_ptr && disp->cmp(___key(ptr + slot*disp->entry_sz),
-						key_ptr, disp->key_sz) == 0) {
+		} else if (key_ptr && meta->cmp(___key(ptr + slot*meta->entry_sz),
+						key_ptr, meta->key_sz) == 0) {
 			if (update)
-				__builtin_memcpy(ptr + slot*disp->entry_sz, entry, disp->entry_sz);
+				__builtin_memcpy(ptr + slot*meta->entry_sz, entry, meta->entry_sz);
 			/* EEXIST */
 			return slot;
 		}
@@ -425,19 +425,19 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_disp *disp, void 
 	return -1; /* ENOSPC */
 }
 
-static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t new_cap)
+static inline void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t new_cap)
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *new_ptr = ___reserve_ext(new_cap, disp->entry_sz);
+	void *new_ptr = ___reserve_ext(new_cap, meta->entry_sz);
 	if (!new_ptr)
 		return NULL; /* ENOMEM */
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t ret = ___try_insert(new_ptr, disp, old_ptr + slot*disp->entry_sz,
+			ssize_t ret = ___try_insert(new_ptr, meta, old_ptr + slot*meta->entry_sz,
 						    NULL, false);
 			if (ret < 0) {
 				free(new_ptr);
@@ -486,20 +486,20 @@ static inline void *___rehash(void *old_ptr, struct ___entry_disp *disp, size_t 
 
 #define ___insert_entry(pptr, update, ...) ({\
 	typeof(**(pptr)) entry_ = __VA_ARGS__;\
-	ssize_t slot_ = ___insert((void **)pptr, ___disp(pptr), &entry_,\
+	ssize_t slot_ = ___insert((void **)pptr, ___entry_meta(pptr), &entry_,\
 				  &entry_.key, update);\
 	___value_ptr(pptr, slot_);\
 })
 
-static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
+static inline ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
 				void *entry, void *key_ptr, bool update)
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(ptr, disp, entry, key_ptr, update);
+		ssize_t slot = ___try_insert(ptr, meta, entry, key_ptr, update);
 		if (slot >= 0)
 			return slot;
-		ptr = ___rehash(ptr, disp, 2 * len(ptr));
+		ptr = ___rehash(ptr, meta, 2 * len(ptr));
 		/* FIXME check ENOSPC */
 		if (ptr) *pptr = ptr;
 	} while (ptr);
@@ -521,10 +521,10 @@ static inline ssize_t ___insert(void **pptr, struct ___entry_disp *disp,
  * `false` is returned.
  */
 #define delete(pptr, ref) ({\
-	___delete((void **)pptr, ___disp(pptr), ref);\
+	___delete((void **)pptr, ___entry_meta(pptr), ref);\
 })
 
-static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize_t empty)
+static inline void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize_t empty)
 {
 	size_t cap = len(ptr);
 	ssize_t slot = empty;
@@ -535,7 +535,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = disp->hash(___key(ptr + slot*disp->entry_sz), disp->key_sz) % cap;
+		ssize_t pos = meta->hash(___key(ptr + slot*meta->entry_sz), meta->key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -545,7 +545,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_disp *disp, ssize
 		}
 
 		___inuse_set(ptr, empty);
-		__builtin_memcpy(ptr + empty*disp->entry_sz, ptr + slot*disp->entry_sz, disp->entry_sz);
+		__builtin_memcpy(ptr + empty*meta->entry_sz, ptr + slot*meta->entry_sz, meta->entry_sz);
 		___inuse_clear(ptr, slot);
 		empty = slot;
 
@@ -565,15 +565,15 @@ static inline ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
 	return slot;
 }
 
-static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *value_ptr)
+static inline bool ___delete(void **pptr, struct ___entry_meta *meta, void *value_ptr)
 {
 	void *ptr = *pptr;
-	ssize_t slot = ___get_slot(ptr, disp->entry_sz, value_ptr);
+	ssize_t slot = ___get_slot(ptr, meta->entry_sz, value_ptr);
 	if (slot == -1)
 		return false;
 
 	___inuse_clear(ptr, slot);
-	___shift_cluster(ptr, disp, slot);
+	___shift_cluster(ptr, meta, slot);
 
 	return true;
 }
@@ -592,21 +592,21 @@ static inline bool ___delete(void **pptr, struct ___entry_disp *disp, void *valu
  */
 #define lookup(pptr, ...) ({\
 	___typeof_key(pptr) key_ = __VA_ARGS__;\
-	ssize_t slot_ = ___lookup((void **)pptr, ___disp(pptr), &key_);\
+	ssize_t slot_ = ___lookup((void **)pptr, ___entry_meta(pptr), &key_);\
 	___value_ptr(pptr, slot_);\
 })
 
 static size_t ___lookups = 0;
 static size_t ___lookup_probes = 0;
 
-static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *key_ptr)
+static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *key_ptr)
 {
 	void *ptr = *pptr;
 	size_t cap = len(ptr);
 	if (!cap)
 		return -1;
 
-	ssize_t slot = disp->hash(key_ptr, disp->key_sz) % cap;
+	ssize_t slot = meta->hash(key_ptr, meta->key_sz) % cap;
 	ssize_t end = slot;
 
 	___lookups++;
@@ -614,7 +614,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_disp *disp, void *k
 		___lookup_probes++;
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (disp->cmp(___key(ptr + slot*disp->entry_sz), key_ptr, disp->key_sz) == 0)
+		else if (meta->cmp(___key(ptr + slot*meta->entry_sz), key_ptr, meta->key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);

@@ -2,11 +2,11 @@
 
 The library provides C generic helpers for
 
-* Dynamically growable arrays of arbitrary type
-* Associative arrays with keys and values of any type
-* Outputing a list of variables a built-in type to a file
-* Converting a list of variables a built-in type to a string
-* Tokenizing string into a list of variables a built-in type
+* [Dynamically growable arrays of arbitrary type](#dynamic-arrays)
+* [Associative arrays with keys and values of any type](#associative-arrays)
+* [Outputing a list of variables a built-in type to a file](#output-helpers)
+* [Converting a list of variables a built-in type to a string](#string-conversion)
+* [Tokenizing string into a list of variables a built-in type](#string-tokenization)
 
 ### Pointers with scope lifetime
 
