@@ -51,16 +51,22 @@
  */
 
 /**
- * @type ptr(var)
+ * @type type ptr(var);
  *
  * @brief An automatic pointer that invokes `free()` when leaving the scope.
+ *
+ * @param type pointer type
+ * @param var variable name
  */
 #define ptr(var) *__attribute__((__cleanup__(___pfree))) var
 
 /**
- * @type pptr(var)
+ * @type pptr(var);
  *
  * @brief An automatic pointer to an array of pointers that invokes `vfree()` when leaving the scope.
+ *
+ * @param type pointer type
+ * @param var variable name
  */
 #define pptr(var) **__attribute__((__cleanup__(___pvfree))) var
 
