@@ -8,9 +8,9 @@
  *
  * * [Dynamically growable arrays of arbitrary type](#dynamic-arrays)
  * * [Associative arrays with keys and values of any type](#associative-arrays)
- * * [Outputing a list of variables a built-in type to a file](#output-helpers)
- * * [Converting a list of variables a built-in type to a string](#string-conversion)
- * * [Tokenizing string into a list of variables a built-in type](#string-tokenization)
+ * * [Outputing a list of built-in type variables a file](#output-helpers)
+ * * [Converting a list of built-in type variables to a string](#string-conversion)
+ * * [Tokenizing a string into a list of variables of built-in types](#string-tokenization)
  */
 
 #ifndef ___concat
@@ -112,8 +112,7 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
 	struct ___meta *meta = ___meta(ptr);
 
-	return !meta->ext ||
-		___test_bit(slot, ___inuse_bits(meta));
+	return !meta->ext || ___inuse_test(ptr, slot);
 }
 
 /*
@@ -137,14 +136,14 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
 static inline __attribute__((pure))
-size_t ___static_len(void *ptr __attribute__((__unused__)), size_t c, size_t n)
+size_t ___static_len(void *ptr __attribute__((__unused__)), size_t entry_sz, size_t sz)
 {
-	return n / c;
+	return sz / entry_sz;
 }
 
 static inline __attribute__((pure))
-size_t ___dynamic_len(void *ptr, size_t c __attribute__((__unused__)),
-		      size_t n __attribute__((__unused__)))
+size_t ___dynamic_len(void *ptr, size_t entry_sz __attribute__((__unused__)),
+		      size_t sz __attribute__((__unused__)))
 {
 	if (!ptr)
 		return 0;
@@ -213,34 +212,34 @@ static inline void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 	if (!new_cap)
 		new_cap = ___INITIAL_LEN;
 
-	void *ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct ___meta));
-	if (!ptr)
-		return NULL;
+	void *new_ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct ___meta));
+	if (!new_ptr)
+		return NULL; /* ENOMEM */
 
 	/* truncation requested */
 	if (old_len > new_cap)
 		old_len = new_cap;
 
-	struct ___meta *meta = ___meta(ptr);
+	struct ___meta *meta = ___meta(new_ptr);
 	meta->len = old_len;
 	meta->ext = 0;
 
-	return ptr;
+	return new_ptr;
 }
 
 static inline void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz)
 {
 	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct ___meta)) / entry_sz : 0;
-	void *ptr = old_ptr;
+	void *new_ptr = old_ptr;
 
 	if (new_len > old_cap) {
 		size_t new_cap = old_cap ? old_cap + old_cap/4 : 0;
-		ptr = ___reserve(old_ptr, new_cap, entry_sz);
+		new_ptr = ___reserve(old_ptr, new_cap, entry_sz);
 	}
-	if (ptr)
-		___meta(ptr)->len = new_len;
+	if (new_ptr)
+		___meta(new_ptr)->len = new_len;
 
-	return ptr;
+	return new_ptr;
 }
 
 /**
@@ -311,20 +310,14 @@ static inline void ___pvfree(void *ptr)
  */
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
-#define keyof(ptr, ref) ({\
-	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
-	___key_ptr(&(ptr), slot_);\
-})
-
-#define ___key(entry) (entry)
-
 #define ___typeof_key(pptr) typeof((*(pptr))->key)
-#define ___typeof_value(pptr) typeof((*(pptr))->value)
 
-#define ___key_ptr(pptr, slot) \
+#define ___typed_key_ptr(pptr, slot) \
 	((slot) != -1) ? &(*(pptr))[slot].key : (___typeof_key(pptr) *)NULL;
 
-#define ___value_ptr(pptr, slot) \
+#define ___typeof_value(pptr) typeof((*(pptr))->value)
+
+#define ___typed_value_ptr(pptr, slot) \
 	((slot) != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
 
 struct ___entry_meta {
@@ -349,6 +342,11 @@ struct ___entry_meta {
 		      const char *:	__builtin_strcmp(*(char **)lhs, *(char **)rhs),\
 		      default:		__builtin_memcmp(lhs, rhs, sz)))\
 }
+
+#define keyof(ptr, ref) ({\
+	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
+	___typed_key_ptr(&(ptr), slot_);\
+})
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
 	unsigned long hash = 14695981039346656037UL;
@@ -384,7 +382,7 @@ static inline unsigned long ___hnv1az(const char *key) {
 	bool ret_ = false;\
 	typeof(*(pptr)) ptr_;\
 	ptr_ = ___rehash(*(void **)pptr, ___entry_meta(pptr), cap);\
-	if (ptr_) {\
+	if (ptr_ && *(pptr) != ptr_) {\
 		*(pptr) = ptr_;\
 		ret_ = true;\
 	}\
@@ -403,6 +401,9 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	return ptr;
 }
 
+#define ___key(entry) (entry)
+#define ___entry(ptr, slot) ((ptr) + (slot)*meta->entry_sz)
+
 static inline ssize_t ___try_insert(void *ptr, struct ___entry_meta *meta, void *entry,
 				    void *key_ptr, bool update)
 {
@@ -415,13 +416,13 @@ static inline ssize_t ___try_insert(void *ptr, struct ___entry_meta *meta, void 
 
 	do {
 		if (!___inuse_test(ptr, slot)) {
-			__builtin_memcpy(ptr + slot*meta->entry_sz, entry, meta->entry_sz);
+			__builtin_memcpy(___entry(ptr, slot), entry, meta->entry_sz);
 			___inuse_set(ptr, slot);
 			return slot;
-		} else if (key_ptr && meta->cmp(___key(ptr + slot*meta->entry_sz),
+		} else if (key_ptr && meta->cmp(___key(___entry(ptr, slot)),
 						key_ptr, meta->key_sz) == 0) {
 			if (update)
-				__builtin_memcpy(ptr + slot*meta->entry_sz, entry, meta->entry_sz);
+				__builtin_memcpy(___entry(ptr, slot), entry, meta->entry_sz);
 			/* EEXIST */
 			return slot;
 		}
@@ -443,12 +444,10 @@ static inline void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t 
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t ret = ___try_insert(new_ptr, meta, old_ptr + slot*meta->entry_sz,
-						    NULL, false);
-			if (ret < 0) {
+			ssize_t ret = ___try_insert(new_ptr, meta, ___entry(old_ptr, slot), NULL, false);
+			if (ret == -1) {
 				free(new_ptr);
-				return NULL; /* ENOSPC */
-				/* EEXIST is impossible here */
+				return old_ptr; /* ENOSPC */
 			}
 		}
 	}
@@ -494,7 +493,7 @@ static inline void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t 
 	typeof(**(pptr)) entry_ = __VA_ARGS__;\
 	ssize_t slot_ = ___insert((void **)pptr, ___entry_meta(pptr), &entry_,\
 				  &entry_.key, update);\
-	___value_ptr(pptr, slot_);\
+	___typed_value_ptr(pptr, slot_);\
 })
 
 static inline ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
@@ -505,9 +504,15 @@ static inline ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
 		ssize_t slot = ___try_insert(ptr, meta, entry, key_ptr, update);
 		if (slot >= 0)
 			return slot;
-		ptr = ___rehash(ptr, meta, 2 * len(ptr));
-		/* FIXME check ENOSPC */
-		if (ptr) *pptr = ptr;
+
+		int factor = 2;
+		do {
+			ptr = ___rehash(ptr, meta, factor * len(ptr));
+			factor++;
+		} while (ptr == *pptr);
+
+		if (ptr)
+			*pptr = ptr;
 	} while (ptr);
 
 	return -1; /* ENOMEM */
@@ -541,7 +546,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize
 		if (!___inuse_test(ptr, slot))
 			break;
 
-		ssize_t pos = meta->hash(___key(ptr + slot*meta->entry_sz), meta->key_sz) % cap;
+		ssize_t pos = meta->hash(___key(___entry(ptr, slot)), meta->key_sz) % cap;
 		if (empty <= slot) {
 			if (empty < pos && pos <= slot)
 				continue;
@@ -551,7 +556,7 @@ static inline void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize
 		}
 
 		___inuse_set(ptr, empty);
-		__builtin_memcpy(ptr + empty*meta->entry_sz, ptr + slot*meta->entry_sz, meta->entry_sz);
+		__builtin_memcpy(___entry(ptr, empty), ___entry(ptr, slot), meta->entry_sz);
 		___inuse_clear(ptr, slot);
 		empty = slot;
 
@@ -599,11 +604,8 @@ static inline bool ___delete(void **pptr, struct ___entry_meta *meta, void *valu
 #define lookup(pptr, ...) ({\
 	___typeof_key(pptr) key_ = __VA_ARGS__;\
 	ssize_t slot_ = ___lookup((void **)pptr, ___entry_meta(pptr), &key_);\
-	___value_ptr(pptr, slot_);\
+	___typed_value_ptr(pptr, slot_);\
 })
-
-static size_t ___lookups = 0;
-static size_t ___lookup_probes = 0;
 
 static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *key_ptr)
 {
@@ -615,12 +617,16 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 	ssize_t slot = meta->hash(key_ptr, meta->key_sz) % cap;
 	ssize_t end = slot;
 
+#if ___LOOKUP_STAT
 	___lookups++;
+#endif
 	do {
+#if ___LOOKUP_STAT
 		___lookup_probes++;
+#endif
 		if (!___inuse_test(ptr, slot))
 			break;
-		else if (meta->cmp(___key(ptr + slot*meta->entry_sz), key_ptr, meta->key_sz) == 0)
+		else if (meta->cmp(___key(___entry(ptr, slot)), key_ptr, meta->key_sz) == 0)
 			return slot;
 		slot = (slot + 1) % cap;
 	} while (slot != end);
@@ -654,6 +660,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 	(ptr) += ___narg(__VA_ARGS__);\
 })
 
+#define ___MAX_PR_FMT 4
 
 #define ___fill_pr_fmt(ptr, x)\
 	_Generic(x,\
@@ -671,7 +678,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 		 unsigned long long:	___fill_shift(ptr, '%', 'l', 'l', 'u'),\
 		 float:			___fill_shift(ptr, '%', '.', '2', 'f'),\
 		 double:		___fill_shift(ptr, '%', '.', '4', 'f'),\
-		 long double:		___fill_shift(ptr, '%', '.', '4', 'L', 'f'),\
+		 long double:		___fill_shift(ptr, '%', 'L', 'f'),\
 		 char *:		___fill_shift(ptr, '%', 's'),\
 		 const char *:		___fill_shift(ptr, '%', 's'),\
 		 volatile char *:	___fill_shift(ptr, '%', 's'),\
@@ -705,7 +712,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
  * @return The number of characters printed.
  */
 #define fprint(fp, ...) ({\
-	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
+	char fmt_[___narg(__VA_ARGS__) * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
 	___fill_fmt(dst_, __VA_ARGS__);\
 	*dst_++ = '\0';\
@@ -734,7 +741,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
  * @return The number of characters printed.
  */
 #define fprintln(fp, ...) ({\
-	char fmt_[___narg(__VA_ARGS__)*4 + 2];\
+	char fmt_[___narg(__VA_ARGS__) * ___MAX_PR_FMT + 2];\
 	char *dst_ = fmt_;\
 	___fill_fmt(dst_, __VA_ARGS__);\
 	*dst_++ = '\n';\
@@ -774,7 +781,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 #define ___fprintv(fp, sep, ptr, len) ({\
 	int nb_ = 0;\
 	size_t len_ = len;\
-	char fmt_[4 + 2 + 1];\
+	char fmt_[2 * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
 	___typeof_ref(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
@@ -813,7 +820,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
  * @return The pointer to joined string, should be released by calling `free()`.
  */
 #define join(...) ({\
-	char fmt_[___narg(__VA_ARGS__)*4 + 1];\
+	char fmt_[___narg(__VA_ARGS__) * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
 	___fill_fmt(dst_, __VA_ARGS__);\
 	*dst_++ = '\0';\
@@ -843,7 +850,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 #define ___joinv(sep, ptr, len) ({\
 	int nb_ = 0;\
 	size_t len_ = len;\
-	char fmt_[4 + 2 + 1];\
+	char fmt_[2 * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
 	___typeof_ref(ptr) ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
