@@ -9,7 +9,7 @@ helpers.o: helpers.c
 helpers.c: helpers.h
 
 README.md: helpers.h
-	mdgen.sh -d $^ > $@
+	./mdgen.sh -d $^ > $@
 
 test:
 	$(MAKE) -C tests

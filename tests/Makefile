@@ -13,7 +13,7 @@ all: $(targets)
 
 %: %.c ../helpers.h ../helpers.c
 	@$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
-	@printf '  %-8s %-14s ' "TEST" "$@"
+	@printf '  %-8s %-14s' "TEST" "$@"
 	-@./$@ > $@.log
 	-@diff $@.log $@.cmp > /dev/null && echo -e "OK"
 
