@@ -4,22 +4,17 @@
 
 all: libgh.a README.md test
 
-libgh.a: helpers.o
-
-	@ar r libgh.a helpers.o
-
-helpers.c: helpers.h
+libgh.a: libgh.a(helpers.o)
 helpers.o: helpers.c
-
-	@gcc -c helpers.c
-
-test:
-	@cd tests && make
-
-clean:
-	rm -f helpers.o libgh.a
-	@cd tests && make clean
+helpers.c: helpers.h
 
 README.md: helpers.h
-	@echo gen $@
-	@mdgen.sh -d $^ > $@
+	mdgen.sh -d $^ > $@
+
+test:
+	$(MAKE) -C tests
+
+clean:
+	$(RM) helpers.o libgh.a
+	$(MAKE) -C tests clean
+
