@@ -206,7 +206,6 @@ size_t ___dynamic_len(void *ptr, size_t entry_sz __attribute__((__unused__)),
 })
 
 void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz);
-void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz);
 
 /**
  * @fn ssize_t append(type **pptr, type init);
@@ -232,6 +231,8 @@ void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz);
 	}\
 	slot_;\
 })
+
+void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz);
 
 /**
  * @fn void vfree(type **ptr);
@@ -277,14 +278,16 @@ static inline void ___pvfree(void *ptr)
 #define entry(ktype, vtype) struct { ktype key; vtype value; }
 
 #define ___typeof_key(pptr) typeof((*(pptr))->key)
+#define ___typeof_value(pptr) typeof((*(pptr))->value)
 
 #define ___typed_key_ptr(pptr, slot) \
 	((slot) != -1) ? &(*(pptr))[slot].key : (___typeof_key(pptr) *)NULL;
 
-#define ___typeof_value(pptr) typeof((*(pptr))->value)
-
 #define ___typed_value_ptr(pptr, slot) \
 	((slot) != -1) ? &(*(pptr))[slot].value : (___typeof_value(pptr) *)NULL;
+
+#define ___key(entry) (entry)
+#define ___entry(ptr, slot) ((ptr) + (slot)*meta->entry_sz)
 
 struct ___entry_meta {
 	size_t key_sz;
@@ -354,9 +357,6 @@ static inline unsigned long ___hnv1az(const char *key) {
 	}\
 	ret_;\
 })
-
-#define ___key(entry) (entry)
-#define ___entry(ptr, slot) ((ptr) + (slot)*meta->entry_sz)
 
 void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t new_cap);
 

@@ -51,7 +51,7 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 }
 
 static ssize_t ___try_insert(void *ptr, struct ___entry_meta *meta, void *entry,
-				    void *key_ptr, bool update)
+			     void *key_ptr, bool update)
 {
 	size_t cap = len(ptr);
 	if (!cap)
@@ -102,7 +102,7 @@ void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t new_cap)
 }
 
 ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
-				void *entry, void *key_ptr, bool update)
+		  void *entry, void *key_ptr, bool update)
 {
 	void *ptr = *pptr;
 	do {
