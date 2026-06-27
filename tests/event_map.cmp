@@ -28529,3 +28529,4 @@ found event 13154 count=9261
 len(event_map)=12800
 count(event_map)=8105
 len(event_list)=9262
+lookup_probes=1.8398

@@ -1,3 +1,4 @@
+#define LOOKUP_STAT
 #include "helpers.h"
 
 int *event_list = NULL;
@@ -86,6 +87,7 @@ int main()
 	println("len(event_map)=", len(event_map));
 	println("count(event_map)=", count(event_map));
 	println("len(event_list)=", len(event_list));
+	println("lookup_probes=", lookup_probes());
 
 	return 0;
 }

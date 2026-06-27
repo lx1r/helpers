@@ -177,6 +177,9 @@ bool ___delete(void **pptr, struct ___entry_meta *meta, void *value_ptr)
 	return true;
 }
 
+ssize_t ___lookups = 0;
+ssize_t ___lookup_probes = 0;
+
 char *___get_tok(const char *str, const char *sep, const char **next)
 {
 	size_t tok_len;

@@ -441,11 +441,17 @@ bool ___delete(void **pptr, struct ___entry_meta *meta, void *value_ptr);
 	___typed_value_ptr(pptr, slot_);\
 })
 
-#if LOOKUP_STAT
-#define lookup_probes (((double)___lookup_probes) / ___lookups)
+#ifdef LOOKUP_STAT
+#define ___lookup_inc() ___lookups++
+#define ___lookup_probe_inc() ___lookup_probes++
 #else
-#define lookup_probes 0
+#define ___lookup_inc()
+#define ___lookup_probe_inc()
 #endif
+#define lookup_probes() (((double)___lookup_probes) / ___lookups)
+
+extern ssize_t ___lookups;
+extern ssize_t ___lookup_probes;
 
 static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *key_ptr)
 {
@@ -457,13 +463,9 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 	ssize_t slot = meta->hash(key_ptr, meta->key_sz) % cap;
 	ssize_t end = slot;
 
-#if LOOKUP_STAT
-	___lookups++;
-#endif
+	___lookup_inc();
 	do {
-#if LOOKUP_STAT
-		___lookup_probes++;
-#endif
+		___lookup_probe_inc();
 		if (!___inuse_test(ptr, slot))
 			break;
 		else if (meta->cmp(___key(___entry(ptr, slot)), key_ptr, meta->key_sz) == 0)
