@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <malloc.h>
-
 #include "helpers.h"
 
 #define INITIAL_LEN	___nr_bits(unsigned long)
@@ -155,7 +151,7 @@ static void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize_t empt
 	} while (slot != end);
 }
 
-ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
+static ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
 {
 	size_t cap = len(ptr);
 	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / entry_sz;

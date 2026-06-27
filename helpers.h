@@ -309,12 +309,10 @@ struct ___entry_meta {
 		      default:		__builtin_memcmp(lhs, rhs, sz)))\
 }
 
-#define keyof(ptr, ref) ({\
-	ssize_t slot_ = ___get_slot(ptr, sizeof(*(ptr)), ref);\
-	___typed_key_ptr(&(ptr), slot_);\
+#define keyof(ref, type) ({\
+	const typeof(((type *)0)->value) *ref_ = (ref);\
+	&(((type *)((void *)ref_ - __builtin_offsetof(type, value)))->key);\
 })
-
-ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr);
 
 static inline unsigned long ___hnv1a(const void *key, size_t len) {
 	unsigned long hash = 14695981039346656037UL;

@@ -25,7 +25,7 @@ int main()
 
 	struct val *val = lookup(&map, {1, 11});
 	if (val) {
-		struct key *key = keyof(map, val);
+		struct key *key = keyof(val, typeof(*map));
 		println("found key=", key->id, ":", key->type,
 			" val=", val->conf, ":", val->data);
 	}
