@@ -27,14 +27,6 @@
 	___nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#define ___nr_bits(x)		(sizeof(x) * 8)
-#define ___bit_mask(nr, x)	(((typeof(x))1) << ((nr) % ___nr_bits(x)))
-#define ___bit_word(nr, x)	((nr) / ___nr_bits(x))
-
-#define ___test_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))]  &  ___bit_mask(nr, *(bits)))
-#define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
-#define ___clear_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] &= ~___bit_mask(nr, *(bits)))
-
 #ifndef NO_LIBC
 
 #include <stdio.h>
@@ -74,8 +66,8 @@ static inline void ___pfree(void *ptr)
 	*pptr = NULL;
 }
 
-#define ___cap_sz(ptr)		malloc_usable_size(ptr)
-#define ___inuse_sz(len)	((___bit_word((len) - 1, unsigned long) + 1) * sizeof(unsigned long))
+#define ___cap_sz(ptr) malloc_usable_size(ptr) /* assume sizeof(size_t) alignment */
+#define ___inuse_sz(len) (((((len) - 1) / __LONG_WIDTH__) + 1) * __SIZEOF_LONG__)
 
 struct ___meta {
 	size_t len:__SIZE_WIDTH__ - 1;
@@ -87,16 +79,22 @@ static inline struct ___meta *___meta(void *ptr)
 	return ptr + ___cap_sz(ptr) - sizeof(struct ___meta);
 }
 
-static inline unsigned long *___inuse_bits(struct ___meta *meta)
+static inline unsigned long *___inuse_bits(void *ptr)
 {
+	struct ___meta *meta = ___meta(ptr);
 	if (!meta->ext)
 		return NULL;
 	return (void *)meta - ___inuse_sz(meta->len);
 }
 
-#define ___inuse_test(ptr, slot)	___test_bit(slot, ___inuse_bits(___meta(ptr)))
-#define ___inuse_set(ptr, slot)		___set_bit(slot, ___inuse_bits(___meta(ptr)))
-#define ___inuse_clear(ptr, slot)	___clear_bit(slot, ___inuse_bits(___meta(ptr)))
+#define ___inuse_test(ptr, slot) \
+	(___inuse_bits(ptr)[(slot) / __LONG_WIDTH__] & (1UL << ((slot) % __LONG_WIDTH__)))
+
+#define ___inuse_set(ptr, slot) \
+	(___inuse_bits(ptr)[(slot) / __LONG_WIDTH__] |= (1UL << ((slot) % __LONG_WIDTH__)))
+
+#define ___inuse_clear(ptr, slot) \
+	(___inuse_bits(ptr)[(slot) / __LONG_WIDTH__] &= ~(1UL << ((slot) % __LONG_WIDTH__)))
 
 #define ___inuse(ptr, slot) \
 	_Generic(&(ptr),\

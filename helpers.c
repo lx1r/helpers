@@ -1,6 +1,6 @@
 #include "helpers.h"
 
-#define INITIAL_LEN	___nr_bits(unsigned long)
+#define INITIAL_LEN 64
 
 void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 {
@@ -46,7 +46,7 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	struct ___meta *meta = ___meta(ptr);
 	meta->len = cap;
 	meta->ext = 1;
-	__builtin_memset(___inuse_bits(meta), 0, ___inuse_sz(cap));
+	__builtin_memset(___inuse_bits(ptr), 0, ___inuse_sz(cap));
 	return ptr;
 }
 
