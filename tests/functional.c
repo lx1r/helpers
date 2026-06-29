@@ -1,7 +1,7 @@
 #include "helpers.h"
 
 #define map(fn, lt) ({\
-	___typeof_ref(lt) ret_ = NULL;\
+	typeof(&(*(lt))) ret_ = NULL;\
 	foreach (ref, lt) append(&ret_, fn(*ref));\
 	ret_;\
 })

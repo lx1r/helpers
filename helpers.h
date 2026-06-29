@@ -35,10 +35,6 @@
 #define ___set_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] |=  ___bit_mask(nr, *(bits)))
 #define ___clear_bit(nr, bits)	((bits)[___bit_word(nr, *(bits))] &= ~___bit_mask(nr, *(bits)))
 
-#define ___typeof_ref(ptr) typeof(&(*(ptr)))
-
-#define ___builtin_len(ptr) (sizeof(ptr)/sizeof(ptr[0]))
-
 #ifndef NO_LIBC
 
 #include <stdio.h>
@@ -170,11 +166,11 @@ size_t ___dynamic_len(void *ptr, size_t entry_sz __attribute__((__unused__)),
 	___apply(___foreach, ___narg(__VA_ARGS__))(ref, ptr, ##__VA_ARGS__)
 
 #define ___foreach0(ref, ptr) \
-	for (___typeof_ref(ptr) ref = (ptr); ref < (ptr) + len(ptr); ref++) \
+	for (__auto_type ref = (ptr); ref < (ptr) + len(ptr); ref++) \
 	if (___inuse(ptr, (ref) - (ptr)))
 
 #define ___foreach1(ref, ptr, n) \
-	for (___typeof_ref(ptr) ref = (ptr); ref < (ptr) + (n); ref++)
+	for (__auto_type ref = (ptr); ref < (ptr) + (n); ref++)
 
 /*
  * ### Dynamic arrays
@@ -625,7 +621,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 	size_t len_ = len;\
 	char fmt_[2 * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
-	___typeof_ref(ptr) ptr_ = ptr;\
+	__auto_type ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
 	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
@@ -694,7 +690,7 @@ static inline ssize_t ___lookup(void **pptr, struct ___entry_meta *meta, void *k
 	size_t len_ = len;\
 	char fmt_[2 * ___MAX_PR_FMT + 1];\
 	char *dst_ = fmt_;\
-	___typeof_ref(ptr) ptr_ = ptr;\
+	__auto_type ptr_ = ptr;\
 	___fill_pr_fmt(dst_, "");\
 	___fill_pr_fmt(dst_, *ptr_);\
 	*dst_ = '\0';\
