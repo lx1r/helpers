@@ -23,7 +23,7 @@ void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
 	return new_ptr;
 }
 
-void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz)
+void *___extend(void *old_ptr, size_t new_len, size_t entry_sz)
 {
 	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct ___meta)) / entry_sz : 0;
 	void *new_ptr = old_ptr;
@@ -38,7 +38,7 @@ void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz)
 	return new_ptr;
 }
 
-static inline void *___reserve_ext(size_t cap, size_t entry_sz)
+static inline void *reserve_ext(size_t cap, size_t entry_sz)
 {
 	void *ptr = malloc(entry_sz*cap + sizeof(struct ___meta) + ___inuse_sz(cap));
 	if (!ptr)
@@ -50,8 +50,8 @@ static inline void *___reserve_ext(size_t cap, size_t entry_sz)
 	return ptr;
 }
 
-static ssize_t ___try_insert(void *ptr, struct ___entry_meta *meta, void *entry,
-			     void *key_ptr, bool update)
+static ssize_t try_insert(void *ptr, struct ___entry_meta *meta, void *entry,
+			  void *key_ptr, bool update)
 {
 	size_t cap = len(ptr);
 	if (!cap)
@@ -84,13 +84,13 @@ void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t new_cap)
 	if (!new_cap)
 		new_cap = INITIAL_LEN;
 
-	void *new_ptr = ___reserve_ext(new_cap, meta->entry_sz);
+	void *new_ptr = reserve_ext(new_cap, meta->entry_sz);
 	if (!new_ptr)
 		return NULL; /* ENOMEM */
 
 	for (ssize_t slot = 0; slot < old_len; slot++) {
 		if (___inuse_test(old_ptr, slot)) {
-			ssize_t ret = ___try_insert(new_ptr, meta, ___entry(old_ptr, slot), NULL, false);
+			ssize_t ret = try_insert(new_ptr, meta, ___entry(old_ptr, slot), NULL, false);
 			if (ret == -1) {
 				free(new_ptr);
 				return old_ptr; /* ENOSPC */
@@ -106,7 +106,7 @@ ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
 {
 	void *ptr = *pptr;
 	do {
-		ssize_t slot = ___try_insert(ptr, meta, entry, key_ptr, update);
+		ssize_t slot = try_insert(ptr, meta, entry, key_ptr, update);
 		if (slot >= 0)
 			return slot;
 
@@ -123,7 +123,7 @@ ssize_t ___insert(void **pptr, struct ___entry_meta *meta,
 	return -1; /* ENOMEM */
 }
 
-static void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize_t empty)
+static void shift_cluster(void *ptr, struct ___entry_meta *meta, ssize_t empty)
 {
 	size_t cap = len(ptr);
 	ssize_t slot = empty;
@@ -151,7 +151,7 @@ static void ___shift_cluster(void *ptr, struct ___entry_meta *meta, ssize_t empt
 	} while (slot != end);
 }
 
-static ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
+static ssize_t slot_of(void *value_ptr, void *ptr, size_t entry_sz)
 {
 	size_t cap = len(ptr);
 	ssize_t slot = ((size_t)value_ptr - (size_t)ptr) / entry_sz;
@@ -167,12 +167,12 @@ static ssize_t ___get_slot(void *ptr, size_t entry_sz, void *value_ptr)
 bool ___delete(void **pptr, struct ___entry_meta *meta, void *value_ptr)
 {
 	void *ptr = *pptr;
-	ssize_t slot = ___get_slot(ptr, meta->entry_sz, value_ptr);
+	ssize_t slot = slot_of(value_ptr, ptr, meta->entry_sz);
 	if (slot == -1)
 		return false;
 
 	___inuse_clear(ptr, slot);
-	___shift_cluster(ptr, meta, slot);
+	shift_cluster(ptr, meta, slot);
 
 	return true;
 }

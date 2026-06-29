@@ -67,7 +67,6 @@ static inline void ___pfree(void *ptr)
 }
 
 #define ___cap_sz(ptr) malloc_usable_size(ptr) /* assume sizeof(size_t) alignment */
-#define ___inuse_sz(len) (((((len) - 1) / __LONG_WIDTH__) + 1) * __SIZEOF_LONG__)
 
 struct ___meta {
 	size_t len:__SIZE_WIDTH__ - 1;
@@ -78,6 +77,8 @@ static inline struct ___meta *___meta(void *ptr)
 {
 	return ptr + ___cap_sz(ptr) - sizeof(struct ___meta);
 }
+
+#define ___inuse_sz(len) (((((len) - 1) / __LONG_WIDTH__) + 1) * __SIZEOF_LONG__)
 
 static inline unsigned long *___inuse_bits(void *ptr)
 {
@@ -216,7 +217,7 @@ void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz);
  */
 #define append(pptr, ...) ({\
 	ssize_t slot_ = len(*(pptr));\
-	typeof(*(pptr)) ptr_ = ___try_extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
+	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
 	if (ptr_) {\
 		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
 		*(pptr) = ptr_;\
@@ -226,7 +227,7 @@ void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz);
 	slot_;\
 })
 
-void *___try_extend(void *old_ptr, size_t new_len, size_t entry_sz);
+void *___extend(void *old_ptr, size_t new_len, size_t entry_sz);
 
 /**
  * @fn void vfree(type **ptr);
