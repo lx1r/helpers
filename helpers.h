@@ -27,8 +27,6 @@
 	___nth(_, ##__VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#ifndef NO_LIBC
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -808,5 +806,4 @@ char *___get_tok(const char *str, const char *sep, const char **next);
 #define ___decl11(x, ...) x; ___decl10(__VA_ARGS__)
 #define ___decl12(x, ...) x; ___decl11(__VA_ARGS__)
 
-#endif /* NO_LIBC */
 #endif
