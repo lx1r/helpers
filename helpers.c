@@ -1,40 +1,21 @@
 #include "helpers.h"
 
-#define INITIAL_LEN 64
-
-void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz)
-{
-	size_t old_len = len(old_ptr);
-	if (!new_cap)
-		new_cap = INITIAL_LEN;
-
-	void *new_ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct ___meta));
-	if (!new_ptr)
-		return NULL; /* ENOMEM */
-
-	/* truncation requested */
-	if (old_len > new_cap)
-		old_len = new_cap;
-
-	struct ___meta *meta = ___meta(new_ptr);
-	meta->len = old_len;
-	meta->ext = 0;
-
-	return new_ptr;
-}
+#define INITIAL_CAP 64
 
 void *___extend(void *old_ptr, size_t new_len, size_t entry_sz)
 {
-	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct ___meta)) / entry_sz : 0;
 	void *new_ptr = old_ptr;
+	size_t old_cap = old_ptr ? (___cap_sz(old_ptr) - sizeof(struct ___meta)) / entry_sz : 0;
 
 	if (new_len > old_cap) {
-		size_t new_cap = old_cap ? old_cap + old_cap/4 : 0;
-		new_ptr = ___reserve(old_ptr, new_cap, entry_sz);
+		size_t new_cap = (new_len + new_len/4 + (INITIAL_CAP - 1)) & ~(INITIAL_CAP - 1);
+		new_ptr = realloc(old_ptr, new_cap*entry_sz + sizeof(struct ___meta));
 	}
-	if (new_ptr)
-		___meta(new_ptr)->len = new_len;
-
+	if (new_ptr) {
+		struct ___meta *meta = ___meta(new_ptr);
+		meta->len = new_len;
+		meta->ext = 0;
+	}
 	return new_ptr;
 }
 
@@ -82,7 +63,7 @@ void *___rehash(void *old_ptr, struct ___entry_meta *meta, size_t new_cap)
 {
 	size_t old_len = len(old_ptr);
 	if (!new_cap)
-		new_cap = INITIAL_LEN;
+		new_cap = INITIAL_CAP;
 
 	void *new_ptr = reserve_ext(new_cap, meta->entry_sz);
 	if (!new_ptr)
