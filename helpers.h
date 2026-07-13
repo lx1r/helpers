@@ -7,8 +7,8 @@
  * The library provides C generic helpers for
  *
  * * [Dynamically growable arrays of arbitrary type](#dynamic-arrays)
- * * [Associative arrays with keys and values of any type](#associative-arrays)
- * * [Outputing a list of built-in type variables a file](#output-helpers)
+ * * [Associative arrays with generic keys and values](#associative-arrays)
+ * * [Printing a list of built-in type variables to a file](#output-helpers)
  * * [Converting a list of built-in type variables to a string](#string-conversion)
  * * [Tokenizing a string into a list of variables of built-in types](#string-tokenization)
  */
@@ -174,33 +174,6 @@ size_t ___dynamic_len(void *ptr, size_t entry_sz __attribute__((__unused__)),
  */
 
 /**
- * @fn boot reserve(type **pptr, size_t cap);
- *
- * @brief Changes the capacity of a dynamic array.
- *
- * @param pptr pointer to the dynamic array, may be any type
- * @param cap requested capacity
- *
- * If the array length is less than the requested capacity,
- * the length will be truncated.
- *
- * @return On success, `true` is returned. If the requested
- * capacity cannot be allocated then `false` is returned and the original
- * dynamic array is left untouched.
- */
-#define reserve(pptr, cap) ({\
-	bool ret_ = false;\
-	typeof(*(pptr)) ptr_ = ___reserve(*(void **)pptr, cap, sizeof(**(pptr)));\
-	if (ptr_) {\
-		*(pptr) = ptr_;\
-		ret_ = true;\
-	}\
-	ret_;\
-})
-
-void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz);
-
-/**
  * @fn ssize_t append(type **pptr, type init);
  *
  * @brief Adds an element to the end of a dynamic array, expands memory
@@ -210,14 +183,35 @@ void *___reserve(void *old_ptr, size_t new_cap, size_t entry_sz);
  * @param init initializer for a new array element, may be an aggregate initializer list
  *
  * @return Index in the array where the new value is appended or `-1`
- * if something went wrong, the index is valid until any method on the
- * dynamic array is called.
+ * if something went wrong.
  */
 #define append(pptr, ...) ({\
 	ssize_t slot_ = len(*(pptr));\
 	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + 1, sizeof(**(pptr)));\
 	if (ptr_) {\
 		ptr_[slot_] = (typeof(*ptr_))__VA_ARGS__;\
+		*(pptr) = ptr_;\
+	} else {\
+		slot_ = -1;\
+	}\
+	slot_;\
+})
+
+/**
+ * @fn ssize_t extend(type **pptr, ssize_t len);
+ *
+ * @brief Changes the size of a dynamic array.
+ *
+ * @param pptr pointer to the dynamic array, may be any type
+ * @param len requested additional number of elements
+ *
+ * @return Index in the array from which it is extended or `-1`
+ * if something went wrong.
+ */
+#define extend(pptr, ext) ({\
+	ssize_t slot_ = len(*(pptr));\
+	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + ext, sizeof(**(pptr)));\
+	if (ptr_) {\
 		*(pptr) = ptr_;\
 	} else {\
 		slot_ = -1;\
