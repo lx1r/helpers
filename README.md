@@ -3,8 +3,8 @@
 The library provides C generic helpers for
 
 * [Dynamically growable arrays of arbitrary type](#dynamic-arrays)
-* [Associative arrays with keys and values of any type](#associative-arrays)
-* [Outputing a list of built-in type variables a file](#output-helpers)
+* [Associative arrays with generic keys and values](#associative-arrays)
+* [Printing a list of built-in type variables to a file](#output-helpers)
 * [Converting a list of built-in type variables to a string](#string-conversion)
 * [Tokenizing a string into a list of variables of built-in types](#string-tokenization)
 
@@ -53,21 +53,6 @@ an associative array.
 ### Dynamic arrays
 
 ---
-`boot reserve(type **pptr, size_t cap);`
-
-Changes the capacity of a dynamic array.
-
-* `pptr` - pointer to the dynamic array, may be any type
-* `cap` - requested capacity
-
-If the array length is less than the requested capacity,
-the length will be truncated.
-
-**Returns:** On success, `true` is returned. If the requested
-capacity cannot be allocated then `false` is returned and the original
-dynamic array is left untouched.
-
----
 `ssize_t append(type **pptr, type init);`
 
 Adds an element to the end of a dynamic array, expands memory
@@ -77,8 +62,18 @@ usage if necessary.
 * `init` - initializer for a new array element, may be an aggregate initializer list
 
 **Returns:** Index in the array where the new value is appended or `-1`
-if something went wrong, the index is valid until any method on the
-dynamic array is called.
+if something went wrong.
+
+---
+`ssize_t extend(type **pptr, ssize_t len);`
+
+Changes the size of a dynamic array.
+
+* `pptr` - pointer to the dynamic array, may be any type
+* `len` - requested additional number of elements
+
+**Returns:** Index in the array from which it is extended or `-1`
+if something went wrong.
 
 ---
 `void vfree(type **ptr);`

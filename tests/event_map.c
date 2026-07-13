@@ -68,7 +68,8 @@ void sanity_test(void)
 int main()
 {
 	sanity_test();
-	reserve(&event_list, 400);
+	extend(&event_list, 400);
+	extend(&event_list, -400);
 	rehash(&event_map, 400);
 	sanity_test();
 
