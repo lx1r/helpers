@@ -210,7 +210,7 @@ size_t ___dynamic_len(void *ptr, size_t entry_sz __attribute__((__unused__)),
  */
 #define extend(pptr, ext) ({\
 	ssize_t slot_ = len(*(pptr));\
-	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + ext, sizeof(**(pptr)));\
+	typeof(*(pptr)) ptr_ = ___extend(*(pptr), slot_ + (ext), sizeof(**(pptr)));\
 	if (ptr_) {\
 		*(pptr) = ptr_;\
 	} else {\
