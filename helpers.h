@@ -128,7 +128,7 @@ static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 		 default: ___static_len)(ptr, sizeof((ptr)[0]), sizeof(ptr))
 
 static inline __attribute__((pure))
-size_t ___static_len(void *ptr __attribute__((__unused__)), size_t entry_sz, size_t sz)
+size_t ___static_len(const void *ptr __attribute__((__unused__)), size_t entry_sz, size_t sz)
 {
 	return sz / entry_sz;
 }
