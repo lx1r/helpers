@@ -97,8 +97,14 @@ static inline unsigned long *___inuse_bits(void *ptr)
 
 #define ___inuse(ptr, slot) \
 	_Generic(&(ptr),\
-		 typeof(*(ptr)) **: ___inuse_dynamic(ptr, slot),\
-		 default: true)
+		 typeof(*(ptr)) **: ___inuse_dynamic,\
+		 default: ___inuse_static)(ptr, slot)
+
+static inline bool ___inuse_static(const void *ptr __attribute__((__unused__)),
+				   ssize_t slot __attribute__((__unused__)))
+{
+	return true;
+}
 
 static inline bool ___inuse_dynamic(void *ptr, ssize_t slot)
 {
