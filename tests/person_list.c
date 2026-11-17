@@ -2,29 +2,22 @@
 
 struct person {
 	char *name;
+	char *surname;
 	int born;
 };
 
-void persons_cleanup(struct person **persons_ptr)
-{
-	foreach (p, *persons_ptr) {
-		free(p->name);
-	free(*persons_ptr);
-	*persons_ptr = NULL;
-}
-
 int main()
 {
-	struct person ptr(swp, persons_cleanup) = NULL;
+	struct person *swp = NULL;
 
-	append(&swp, {join("Mark", " ", "Hamill"), 1951});
-	append(&swp, {join("Harrison", " ", "Ford"), 1942});
-	append(&swp, {join("Carrie", " ", "Fisher"), 1956});
-	append(&swp, {join("Peter", " ", "Cushing"), 1913});
-	append(&swp, {join("Alec", " ", "Guinness"), 1914});
+	append(&swp, {"Mark", "Hamill", 1951});
+	append(&swp, {"Harrison", "Ford", 1942});
+	append(&swp, {"Carrie", "Fisher", 1956});
+	append(&swp, {"Peter", "Cushing", 1913});
+	append(&swp, {"Alec", "Guinness", 1914});
 
 	foreach (p, swp)
-		println(p->name, ", ", p->born);
+		println(p->name, " ", p->surname, ", ", p->born);
 	println("Total: ", len(swp));
 
 	return 0;

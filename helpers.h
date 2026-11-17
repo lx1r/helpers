@@ -37,31 +37,32 @@
  */
 
 /**
- * @type type ptr(var, void (*func)(type **) = zfree);
+ * @type type ptr(var);
  *
- * @brief An automatic pointer that invokes `func(&var)` when leaving the scope.
+ * @brief An automatic pointer that invokes `free()` when leaving the scope.
  *
  * @param type pointer type
  * @param var variable name
- * @param func cleanup function
  */
+#define ptr(var) *__attribute__((__cleanup__(___zfree))) var
 
-#define ptr(var, ...) \
-	___apply(___ptr, ___narg(__VA_ARGS__))(var, ##__VA_ARGS__)
-
-#define ___ptr0(var) ___ptr1(var, ___zfree)
-
-#define ___ptr1(var, func) \
-	*__attribute__((__cleanup__(func))) var
+/**
+ * @type pptr(var);
+ *
+ * @brief An automatic pointer to an array of pointers that invokes `vfree()` when leaving the scope.
+ *
+ * @param type pointer type
+ * @param var variable name
+ */
+#define pptr(var) **__attribute__((__cleanup__(___zvfree))) var
 
 static inline void ___zfree(void *ptr)
 {
 	void **pptr = ptr;
+
 	free(*pptr);
 	*pptr = NULL;
 }
-
-#define pptr(var) *___ptr1(var, ___zvfree)
 
 #define ___cap_sz(ptr) malloc_usable_size(ptr) /* assume sizeof(size_t) alignment */
 
